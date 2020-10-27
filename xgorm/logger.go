@@ -11,30 +11,29 @@ import (
 	"time"
 )
 
-// silence
+// SilenceLogger can hide SQL logs and INFO logs.
+// Tips: Default `SetLogMode(false)` will hide only SQL log.
+type SilenceLogger struct{}
 
-// GormSilenceLogger can also hide not only SQL log, but INFO log.
-// Default `SetLogMode(false)` will hide only SQL log.
-type GormSilenceLogger struct{}
-
-func NewGormSilenceLogger() *GormSilenceLogger {
-	return &GormSilenceLogger{}
+// NewSilenceLogger creates a new SilenceLogger.
+func NewSilenceLogger() *SilenceLogger {
+	return &SilenceLogger{}
 }
 
-func (g *GormSilenceLogger) Print(...interface{}) {}
+func (g *SilenceLogger) Print(...interface{}) {}
 
-// logrus.Logger
-
-type GormLogrus struct {
+// LogrusLogger logs SQL and INFO message using logrus.Logger.
+type LogrusLogger struct {
 	logger *logrus.Logger
 }
 
-func NewGormLogrus(logger *logrus.Logger) *GormLogrus {
-	return &GormLogrus{logger: logger}
+// NewLogrusLogger creates a new LogrusLogger with logrus.Logger.
+func NewLogrusLogger(logger *logrus.Logger) *LogrusLogger {
+	return &LogrusLogger{logger: logger}
 }
 
 // See gorm.LogFormatter for details.
-func (g *GormLogrus) Print(v ...interface{}) {
+func (g *LogrusLogger) Print(v ...interface{}) {
 	if len(v) <= 1 {
 		return
 	}
@@ -75,17 +74,17 @@ func (g *GormLogrus) Print(v ...interface{}) {
 	}).Info(fmt.Sprintf("[Gorm] [%s] %s", v[0], msg))
 }
 
-// log.Logger
-
-type GormLogger struct {
+// StdLogLogger logs SQL and INFO message using log.Logger.
+type StdLogLogger struct {
 	logger *log.Logger
 }
 
-func NewGormLogger(logger *log.Logger) *GormLogger {
-	return &GormLogger{logger: logger}
+// NewStdLogLogger creates a new StdLogLogger with log.Logger.
+func NewStdLogLogger(logger *log.Logger) *StdLogLogger {
+	return &StdLogLogger{logger: logger}
 }
 
-func (g *GormLogger) Print(v ...interface{}) {
+func (g *StdLogLogger) Print(v ...interface{}) {
 	if len(v) <= 1 {
 		return
 	}
@@ -106,8 +105,6 @@ func (g *GormLogger) Print(v ...interface{}) {
 
 	g.logger.Printf("[Gorm] %s", fmt.Sprint(v[2:]...))
 }
-
-// render
 
 var sqlRegexp = regexp.MustCompile(`(\$\d+)|\?`)
 

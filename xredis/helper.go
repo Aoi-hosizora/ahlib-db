@@ -5,14 +5,22 @@ import (
 	"github.com/gomodule/redigo/redis"
 )
 
+// Helper is an extensions of redis.Conn.
 type Helper struct {
 	conn redis.Conn
 }
 
+// WithDB creates a Helper with redis.Conn.
 func WithConn(conn redis.Conn) *Helper {
 	return &Helper{conn: conn}
 }
 
+// GetDB gets the original redis.Conn.
+func (h *Helper) GetConn() redis.Conn {
+	return h.conn
+}
+
+// DeleteAll: KEYS xxx -> DEL xxx
 func (h *Helper) DeleteAll(pattern string) (total int, del int, err error) {
 	keys, err := redis.Strings(h.conn.Do("KEYS", pattern))
 	if err != nil {
@@ -33,6 +41,7 @@ func (h *Helper) DeleteAll(pattern string) (total int, del int, err error) {
 	return len(keys), cnt, someErr
 }
 
+// SetAll: SET xxx
 func (h *Helper) SetAll(keys []string, values []string) (total int, add int, err error) {
 	cnt := 0
 	if len(keys) != len(values) {
@@ -55,6 +64,7 @@ func (h *Helper) SetAll(keys []string, values []string) (total int, add int, err
 	return len(keys), cnt, someErr
 }
 
+// SetExAll: SET xxx yyy
 func (h *Helper) SetExAll(keys []string, values []string, exs []int64) (total int, add int, err error) {
 	cnt := 0
 	if len(keys) != len(values) && len(keys) != len(exs) {

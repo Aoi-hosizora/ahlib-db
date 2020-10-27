@@ -5,13 +5,15 @@ import (
 	"sync"
 )
 
-// MutexRedis will add a mutex lock to redis.Conn, to solve the concurrent problem:
-// `short write` or `use of closed network connection`.
+// MutexRedis will add a mutex lock to redis.Conn, to solve the concurrent problems:
+// 	short write
+// 	use of closed network connection
 type MutexRedis struct {
 	redis.Conn
 	mu sync.Mutex
 }
 
+// NewMutexRedis creates a new MutexRedis.
 func NewMutexRedis(conn redis.Conn) *MutexRedis {
 	return &MutexRedis{Conn: conn}
 }

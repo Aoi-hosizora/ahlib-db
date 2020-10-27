@@ -15,7 +15,7 @@ func TestLogrus(t *testing.T) {
 		log.Fatalln(err)
 	}
 
-	conn = NewLogrusLogger(conn, logrus.New(), true).WithSkip(3)
+	conn = NewLogrusRedis(conn, logrus.New(), true).WithSkip(3)
 	conn = NewMutexRedis(conn)
 
 	_, _ = conn.Do("GET", "aaaaa-a")
@@ -51,7 +51,7 @@ func TestMutex(t *testing.T) {
 
 	logger := logrus.New()
 	logger.SetFormatter(&logrus.TextFormatter{})
-	conn = NewLogrusLogger(conn, logger, true).WithSkip(3)
+	conn = NewLogrusRedis(conn, logger, true).WithSkip(3)
 	conn = NewMutexRedis(conn)
 
 	wg := sync.WaitGroup{}

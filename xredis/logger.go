@@ -11,25 +11,26 @@ import (
 	"time"
 )
 
-// logrus
-
-type LogrusLogger struct {
+// LogrusRedis logs redis using logrus.Logger.
+type LogrusRedis struct {
 	redis.Conn
 	logger  *logrus.Logger
 	LogMode bool
-	Skip    int
+	Skip    int // default skip is 2
 }
 
-func NewLogrusLogger(conn redis.Conn, logger *logrus.Logger, logMode bool) *LogrusLogger {
-	return &LogrusLogger{Conn: conn, logger: logger, LogMode: logMode, Skip: 2}
+// NewLogrusRedis creates a new LogrusRedis with logrus.Logger.
+func NewLogrusRedis(conn redis.Conn, logger *logrus.Logger, logMode bool) *LogrusRedis {
+	return &LogrusRedis{Conn: conn, logger: logger, LogMode: logMode, Skip: 2}
 }
 
-func (l *LogrusLogger) WithSkip(skip int) *LogrusLogger {
+// WithSkip sets LogrusRedis's Skip.
+func (l *LogrusRedis) WithSkip(skip int) *LogrusRedis {
 	l.Skip = skip
 	return l
 }
 
-func (l *LogrusLogger) Do(commandName string, args ...interface{}) (interface{}, error) {
+func (l *LogrusRedis) Do(commandName string, args ...interface{}) (interface{}, error) {
 	s := time.Now()
 	reply, err := l.Conn.Do(commandName, args...)
 	e := time.Now()
@@ -41,7 +42,7 @@ func (l *LogrusLogger) Do(commandName string, args ...interface{}) (interface{},
 	return reply, err
 }
 
-func (l *LogrusLogger) print(reply interface{}, err error, commandName string, du string, v ...interface{}) {
+func (l *LogrusRedis) print(reply interface{}, err error, commandName string, du string, v ...interface{}) {
 	cmd := renderCommand(commandName, v)
 	_, file, line, _ := runtime.Caller(l.Skip)
 	source := fmt.Sprintf("%s:%d", file, line)
@@ -69,8 +70,7 @@ func (l *LogrusLogger) print(reply interface{}, err error, commandName string, d
 	}).Info(fmt.Sprintf("[Redis] #: %3d | %12s | %15s | %s | %s", cnt, du, t, cmd, source))
 }
 
-// logger
-
+// LogrusRedis logs redis using log.Logger.
 type LoggerRedis struct {
 	redis.Conn
 	logger  *log.Logger
@@ -78,10 +78,12 @@ type LoggerRedis struct {
 	Skip    int
 }
 
+// NewLoggerRedis creates a new LoggerRedis with log.Logger.
 func NewLoggerRedis(conn redis.Conn, logger *log.Logger, logMode bool) *LoggerRedis {
 	return &LoggerRedis{Conn: conn, logger: logger, LogMode: logMode, Skip: 2}
 }
 
+// WithSkip sets LoggerRedis's Skip.
 func (l *LoggerRedis) WithSkip(skip int) *LoggerRedis {
 	l.Skip = skip
 	return l
@@ -116,8 +118,6 @@ func (l *LoggerRedis) print(reply interface{}, err error, commandName string, du
 	l.logger.Printf("[Redis] #: %3d | %12s | %15s | %s | %s", cnt, du, t, cmd, source)
 }
 
-// render
-
 func renderCommand(cmd string, args []interface{}) string {
 	out := cmd
 	for _, arg := range args {
@@ -130,24 +130,27 @@ func renderReply(reply interface{}) (cnt int, t string) {
 	if reply == nil {
 		cnt = 0
 		t = "<nil>"
-	} else if val := reflect.ValueOf(reply); val.Kind() == reflect.Slice && val.IsValid() {
-		cnt = val.Len()
-		t = val.Type().Elem().String()
-		if t == "uint8" { // byte
-			cnt = 1
-			t = "string"
-		} else if t == "interface {}" && val.Len() >= 1 {
-			t = reflect.TypeOf(val.Index(0).Interface()).String()
-			if t == "[]uint8" { // string
-				t = "string"
-			}
-		}
-	} else {
-		cnt = 1
-		t = fmt.Sprintf("%T", reply)
-	}
-	if reply == "OK" {
+	} else if reply == "OK" {
+		cnt = 2
 		t = "string (OK)"
+	} else {
+		val := reflect.ValueOf(reply)
+		if val.Kind() == reflect.Slice && val.IsValid() {
+			cnt = val.Len()
+			t = val.Type().Elem().String()
+			if t == "uint8" { // byte
+				cnt = 1
+				t = "string"
+			} else if t == "interface {}" && val.Len() >= 1 {
+				t = reflect.TypeOf(val.Index(0).Interface()).String()
+				if t == "[]uint8" { // string
+					t = "string"
+				}
+			}
+		} else {
+			cnt = 1
+			t = fmt.Sprintf("%T", reply)
+		}
 	}
 	return
 }

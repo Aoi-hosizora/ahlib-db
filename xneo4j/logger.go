@@ -11,19 +11,20 @@ import (
 	"time"
 )
 
-// logrus
-
+// LogrusNeo4j logs neo4j using logrus.Logger.
 type LogrusNeo4j struct {
 	neo4j.Session
 	logger  *logrus.Logger
 	LogMode bool
-	Skip    int
+	Skip    int // default skip is 2
 }
 
+// NewLogrusNeo4j creates a new LogrusNeo4j with logrus.Logger.
 func NewLogrusNeo4j(session neo4j.Session, logger *logrus.Logger, logMode bool) *LogrusNeo4j {
 	return &LogrusNeo4j{Session: session, logger: logger, LogMode: logMode, Skip: 2}
 }
 
+// WithSkip sets LogrusNeo4j's Skip.
 func (l *LogrusNeo4j) WithSkip(skip int) *LogrusNeo4j {
 	l.Skip = skip
 	return l
@@ -93,8 +94,7 @@ func (l *LogrusNeo4j) print(result neo4j.Result, du string, err error) {
 	}).Info(fmt.Sprintf("[Neo4j] #C: %2d | %12s | %s | %s", len(keys), du, cypher, source))
 }
 
-// logger
-
+// LoggerNeo4j logs redis using log.Logger.
 type LoggerNeo4j struct {
 	neo4j.Session
 	logger  *log.Logger
@@ -102,10 +102,12 @@ type LoggerNeo4j struct {
 	Skip    int
 }
 
+// NewLoggerNeo4j creates a new LoggerNeo4j with log.Logger.
 func NewLoggerNeo4j(session neo4j.Session, logger *log.Logger, logMode bool) *LoggerNeo4j {
 	return &LoggerNeo4j{Session: session, logger: logger, LogMode: logMode, Skip: 2}
 }
 
+// WithSkip sets LoggerNeo4j's Skip.
 func (l *LoggerNeo4j) WithSkip(skip int) *LoggerNeo4j {
 	l.Skip = skip
 	return l
@@ -149,8 +151,6 @@ func (l *LoggerNeo4j) print(result neo4j.Result, du string, err error) {
 
 	l.logger.Printf("[Neo4j] #C: %2d | %12s | %s | %s", len(keys), du, cypher, source)
 }
-
-// render
 
 func render(cypher string, params map[string]interface{}) string {
 	out := cypher

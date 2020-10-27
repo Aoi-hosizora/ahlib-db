@@ -3,28 +3,39 @@ package xgorm
 import (
 	"github.com/Aoi-hosizora/ahlib/xproperty"
 	"github.com/Aoi-hosizora/ahlib/xstatus"
+	"github.com/go-sql-driver/mysql"
 	"github.com/jinzhu/gorm"
 	"strings"
 )
 
+// Helper is an extensions of gorm.DB.
 type Helper struct {
 	db *gorm.DB
 }
 
+// WithDB creates a Helper with gorm.DB.
 func WithDB(db *gorm.DB) *Helper {
 	return &Helper{db: db}
 }
 
+// GetDB gets the original gorm.DB.
+func (h *Helper) GetDB() *gorm.DB {
+	return h.db
+}
+
+// Pagination: db.Limit(limit).Offset((page - 1) * limit)
 func (h *Helper) Pagination(limit int32, page int32) *gorm.DB {
 	return h.db.Limit(limit).Offset((page - 1) * limit)
 }
 
+// Count: db.Model(model).Where(where).Count(&cnt)
 func (h *Helper) Count(model interface{}, where interface{}) (int, error) {
 	cnt := 0
 	rdb := h.db.Model(model).Where(where).Count(&cnt)
 	return cnt, rdb.Error
 }
 
+// Exist: db.Model(model).Where(where).Count(&cnt)
 func (h *Helper) Exist(model interface{}, where interface{}) (bool, error) {
 	cnt, err := h.Count(model, where)
 	if err != nil {
@@ -33,34 +44,26 @@ func (h *Helper) Exist(model interface{}, where interface{}) (bool, error) {
 	return cnt > 0, nil
 }
 
-// db.Model(model).Create(object).
-func (h *Helper) Create(model interface{}, object interface{}) (xstatus.DbStatus, error) {
-	rdb := h.db.Model(model).Create(object)
-	return CreateErr(rdb)
-}
-
-// db.Model(model).Where(where).Update(object).
-func (h *Helper) Update(model interface{}, where interface{}, object interface{}) (xstatus.DbStatus, error) {
-	if where == nil {
-		where = object
-	}
-	rdb := h.db.Model(model).Where(where).Update(object)
-	return UpdateErr(rdb)
-}
-
-// db.Model(model).Where(where).Delete(object).
-func (h *Helper) Delete(model interface{}, where interface{}, object interface{}) (xstatus.DbStatus, error) {
-	if where == nil {
-		where = object
-	}
-	rdb := h.db.Model(model).Where(where).Delete(object)
-	return DeleteErr(rdb)
-}
-
+// IsMySQL checks the dialect of db is "mysql".
 func IsMySQL(db *gorm.DB) bool {
 	return db.Dialect().GetName() == "mysql"
 }
 
+// Reference from http://go-database-sql.org/errors.html and https://github.com/VividCortex/mysqlerr/blob/master/mysqlerr.go.
+const (
+	MySQLDuplicateEntryError = 1062 // ER_DUP_ENTRY
+)
+
+// IsMySQLDuplicateEntryError checks if err is mysql ER_DUP_ENTRY.
+func IsMySQLDuplicateEntryError(err error) bool {
+	if err == nil {
+		return false
+	}
+	mysqlErr, ok := err.(*mysql.MySQLError)
+	return ok && mysqlErr.Number == MySQLDuplicateEntryError
+}
+
+// QueryErr checks gorm.DB's query result.
 func QueryErr(rdb *gorm.DB) (bool, error) {
 	if rdb.RecordNotFound() {
 		return false, nil
@@ -71,6 +74,7 @@ func QueryErr(rdb *gorm.DB) (bool, error) {
 	return true, nil
 }
 
+// CreateErr checks gorm.DB's create result.
 func CreateErr(rdb *gorm.DB) (xstatus.DbStatus, error) {
 	if IsMySQL(rdb) && IsMySQLDuplicateEntryError(rdb.Error) {
 		return xstatus.DbExisted, nil
@@ -81,6 +85,7 @@ func CreateErr(rdb *gorm.DB) (xstatus.DbStatus, error) {
 	return xstatus.DbSuccess, nil
 }
 
+// UpdateErr checks gorm.DB's update result.
 func UpdateErr(rdb *gorm.DB) (xstatus.DbStatus, error) {
 	if IsMySQL(rdb) && IsMySQLDuplicateEntryError(rdb.Error) {
 		return xstatus.DbExisted, nil
@@ -93,6 +98,7 @@ func UpdateErr(rdb *gorm.DB) (xstatus.DbStatus, error) {
 	return xstatus.DbSuccess, nil
 }
 
+// DeleteErr checks gorm.DB's delete result.
 func DeleteErr(rdb *gorm.DB) (xstatus.DbStatus, error) {
 	if rdb.Error != nil {
 		return xstatus.DbFailed, rdb.Error
@@ -103,28 +109,34 @@ func DeleteErr(rdb *gorm.DB) (xstatus.DbStatus, error) {
 	return xstatus.DbSuccess, nil
 }
 
+// OrderByFunc generates a handler function `func(string) string` from xproperty.PropertyDict.
 func OrderByFunc(p xproperty.PropertyDict) func(source string) string {
 	return func(source string) string {
-		result := make([]string, 0)
 		if source == "" {
 			return ""
 		}
 
-		sources := strings.Split(source, ",")
-		for _, src := range sources {
+		result := make([]string, 0)
+		for _, src := range strings.Split(source, ",") {
+			src = strings.TrimSpace(src)
 			if src == "" {
 				continue
 			}
+			srcSp := strings.Split(src, " ")
+			if len(srcSp) > 2 {
+				continue
+			}
 
-			src = strings.TrimSpace(src)
-			reverse := strings.HasSuffix(src, " desc") || strings.HasSuffix(src, " DESC")
-			src = strings.Split(src, " ")[0]
+			src = srcSp[0]
+			reverse := false
+			if len(srcSp) == 2 {
+				reverse = strings.ToUpper(srcSp[1]) == "DESC"
+			}
 
 			dest, ok := p[src]
 			if !ok || dest == nil || len(dest.Destinations) == 0 {
 				continue
 			}
-
 			if dest.Revert {
 				reverse = !reverse
 			}
