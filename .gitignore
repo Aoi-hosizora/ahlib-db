@@ -1,0 +1,10 @@
+### Editor ###
+.vscode/
+.ionide/
+.history/
+.idea/
+
+### Project ###
+logs/
+build/
+coverage.txt
