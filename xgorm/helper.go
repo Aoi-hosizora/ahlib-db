@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// Helper is an extensions of gorm.DB.
+// Helper is an extension of gorm.DB.
 type Helper struct {
 	db *gorm.DB
 }

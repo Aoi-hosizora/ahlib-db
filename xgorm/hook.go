@@ -8,46 +8,46 @@ import (
 )
 
 const (
-	DefaultDeleteAtTimestamp = "1970-01-01 00:00:01"
+	DefaultDeletedAtTimestamp = "1970-01-01 00:00:01"
 )
 
-// GormTime is a structure of CreateAt, UpdateAt, DeleteAt with "1970-01-01 00:00:01" default, is a replacement of gorm.Model.
+// GormTime is a structure of CreatedAt, UpdatedAt, DeletedAt with "1970-01-01 00:00:01" default, is a replacement of gorm.Model.
 type GormTime struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	DeletedAt *time.Time `sql:"index" gorm:"default:'1970-01-01 00:00:01'"`
 }
 
-// GormTimeWithoutDeleteAt is a GormTime without DeleteAt field which can be customized.
-type GormTimeWithoutDeleteAt struct {
+// GormTime2 is a structure of CreatedAt, UpdatedAt, which can customize the DeletedAt field.
+type GormTime2 struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
 
-// HookDeleteAtField changes the soft-delete callback (query, row_query, update, delete) using the new deleteAt timestamp.
-func HookDeleteAtField(db *gorm.DB, defaultDeleteAtTimestamp string) {
+// HookDeletedAt changes the soft-delete callback (query, row_query, update, delete) using the new deleteAt timestamp.
+func HookDeletedAt(db *gorm.DB, deletedAtTimestamp string) {
 	// query
 	db.Callback().Query().
 		Before("gorm:query").
-		Register("new_deleted_at_before_query_callback", newBeforeQueryUpdateCallback(defaultDeleteAtTimestamp))
+		Register("new_deleted_at_before_query_callback", deletedAtQueryUpdateCallback(deletedAtTimestamp))
 
 	// row query
 	db.Callback().RowQuery().
 		Before("gorm:row_query").
-		Register("new_deleted_at_before_row_query_callback", newBeforeQueryUpdateCallback(defaultDeleteAtTimestamp))
+		Register("new_deleted_at_before_row_query_callback", deletedAtQueryUpdateCallback(deletedAtTimestamp))
 
 	// update
 	db.Callback().Update().
 		Before("gorm:update").
-		Register("new_deleted_at_before_update_callback", newBeforeQueryUpdateCallback(defaultDeleteAtTimestamp))
+		Register("new_deleted_at_before_update_callback", deletedAtQueryUpdateCallback(deletedAtTimestamp))
 
 	// delete !!!
 	db.Callback().Delete().
-		Replace("gorm:delete", newDeleteCallback(defaultDeleteAtTimestamp))
+		Replace("gorm:delete", deletedAtDeleteCallback(deletedAtTimestamp))
 }
 
-// newBeforeQueryUpdateCallback is a callback used in HookDeleteAtField, and as a gorm:query, gorm:row_query, gorm:update callback.
-func newBeforeQueryUpdateCallback(defaultDeleteAtTimeStamp string) func(scope *gorm.Scope) {
+// deletedAtQueryUpdateCallback is a callback used in HookDeletedAt, and as a gorm:query, gorm:row_query, gorm:update callback.
+func deletedAtQueryUpdateCallback(defaultDeleteAtTimeStamp string) func(scope *gorm.Scope) {
 	// https://qiita.com/touyu/items/f1ac43b186cd6b26b8c7
 	return func(scope *gorm.Scope) {
 		var (
@@ -64,8 +64,8 @@ func newBeforeQueryUpdateCallback(defaultDeleteAtTimeStamp string) func(scope *g
 	}
 }
 
-// newDeleteCallback is a callback used in HookDeleteAtField, and as a gorm:delete new callback.
-func newDeleteCallback(defaultDeleteAtTimeStamp string) func(scope *gorm.Scope) {
+// deletedAtDeleteCallback is a callback used in HookDeletedAt, and as a gorm:delete new callback.
+func deletedAtDeleteCallback(deletedAtTimestamp string) func(scope *gorm.Scope) {
 	// https://github.com/jinzhu/gorm/blob/master/callback_delete.go
 	return func(scope *gorm.Scope) {
 		if scope.HasError() {
@@ -78,7 +78,7 @@ func newDeleteCallback(defaultDeleteAtTimeStamp string) func(scope *gorm.Scope) 
 		var (
 			quotedTableName                   = scope.QuotedTableName()
 			deletedAtField, hasDeletedAtField = scope.FieldByName("DeletedAt")
-			defaultTimeStamp                  = defaultDeleteAtTimeStamp
+			defaultTimeStamp                  = deletedAtTimestamp
 		)
 
 		addExtraSpaceIfExist := func(str string) string {

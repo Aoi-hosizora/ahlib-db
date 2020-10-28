@@ -4,10 +4,10 @@
 
 #### Normal
 
-+ `const DefaultDeleteAtTimestamp string`
-+ `HookDeleteAtField(db *gorm.DB, defaultDeleteAtTimestamp string)`
++ `const DefaultDeletedAtTimestamp string`
++ `HookDeletedAtField(db *gorm.DB, deletedAtTimestamp string)`
 + `type GormTime struct {}`
-+ `type GormTimeWithoutDeleteAt struct {}`
++ `type GormTime2 struct {}`
 + `type SilenceLogger struct{}`
 + `NewSilenceLogger() *GormSilenceLogger`
 + `type LogrusLogger struct {}`

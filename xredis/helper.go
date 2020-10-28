@@ -5,7 +5,7 @@ import (
 	"github.com/gomodule/redigo/redis"
 )
 
-// Helper is an extensions of redis.Conn.
+// Helper is an extension of redis.Conn.
 type Helper struct {
 	conn redis.Conn
 }
