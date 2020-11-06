@@ -1,6 +1,7 @@
 package xgorm
 
 import (
+	"fmt"
 	"github.com/Aoi-hosizora/ahlib/xproperty"
 	"github.com/Aoi-hosizora/ahlib/xstatus"
 	"github.com/go-sql-driver/mysql"
@@ -66,44 +67,49 @@ func IsMySQLDuplicateEntryError(err error) bool {
 // QueryErr checks gorm.DB's query result.
 func QueryErr(rdb *gorm.DB) (bool, error) {
 	if rdb.RecordNotFound() {
-		return false, nil
+		return false, nil // not found
 	} else if rdb.Error != nil {
-		return false, rdb.Error
+		return false, rdb.Error // failed
 	}
 
 	return true, nil
 }
 
-// CreateErr checks gorm.DB's create result.
+// CreateErr checks gorm.DB's create result,
+// only return xstatus.DbSuccess, xstatus.DbExisted and xstatus.DbFailed.
 func CreateErr(rdb *gorm.DB) (xstatus.DbStatus, error) {
 	if IsMySQL(rdb) && IsMySQLDuplicateEntryError(rdb.Error) {
-		return xstatus.DbExisted, nil
-	} else if rdb.Error != nil || rdb.RowsAffected == 0 {
-		return xstatus.DbFailed, rdb.Error
+		return xstatus.DbExisted, rdb.Error // duplicate
+	} else if rdb.Error != nil {
+		return xstatus.DbFailed, rdb.Error // failed
+	} else if rdb.RowsAffected == 0 {
+		return xstatus.DbFailed, fmt.Errorf("unknown error when create") // failed
 	}
 
 	return xstatus.DbSuccess, nil
 }
 
-// UpdateErr checks gorm.DB's update result.
+// UpdateErr checks gorm.DB's update result,
+// only return xstatus.DbSuccess, xstatus.DbExisted, xstatus.DbFailed and xstatus.DbNotFound.
 func UpdateErr(rdb *gorm.DB) (xstatus.DbStatus, error) {
 	if IsMySQL(rdb) && IsMySQLDuplicateEntryError(rdb.Error) {
-		return xstatus.DbExisted, nil
+		return xstatus.DbExisted, rdb.Error // duplicate
 	} else if rdb.Error != nil {
-		return xstatus.DbFailed, rdb.Error
+		return xstatus.DbFailed, rdb.Error // failed
 	} else if rdb.RowsAffected == 0 {
-		return xstatus.DbNotFound, nil
+		return xstatus.DbNotFound, nil // not found
 	}
 
 	return xstatus.DbSuccess, nil
 }
 
-// DeleteErr checks gorm.DB's delete result.
+// DeleteErr checks gorm.DB's delete result,
+// only return xstatus.DbSuccess, xstatus.DbFailed and xstatus.DbNotFound.
 func DeleteErr(rdb *gorm.DB) (xstatus.DbStatus, error) {
 	if rdb.Error != nil {
-		return xstatus.DbFailed, rdb.Error
+		return xstatus.DbFailed, rdb.Error // failed
 	} else if rdb.RowsAffected == 0 {
-		return xstatus.DbNotFound, nil
+		return xstatus.DbNotFound, nil // not found
 	}
 
 	return xstatus.DbSuccess, nil

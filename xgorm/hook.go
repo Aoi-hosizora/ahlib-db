@@ -8,11 +8,12 @@ import (
 )
 
 const (
+	// DefaultDeletedAtTimestamp is the default deletedAt value.
 	DefaultDeletedAtTimestamp = "1970-01-01 00:00:01"
 )
 
-// GormTime is a structure of CreatedAt, UpdatedAt, DeletedAt with "1970-01-01 00:00:01" default, is a replacement of gorm.Model.
-type GormTime struct {
+// GormTime3 is a structure of CreatedAt, UpdatedAt, DeletedAt with "1970-01-01 00:00:01" default, is a replacement of gorm.Model.
+type GormTime3 struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	DeletedAt *time.Time `sql:"index" gorm:"default:'1970-01-01 00:00:01'"`

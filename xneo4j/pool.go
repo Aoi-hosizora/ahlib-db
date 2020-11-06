@@ -12,7 +12,9 @@ type Pool struct {
 	Dial DialFunc
 }
 
-// Each neo4j.Driver instance maintains a pool of connections inside,
+// NewPool creates a Pool.
+//
+// Tips: Each neo4j.Driver instance maintains a pool of connections inside,
 // as a result, it is recommended to only use one driver per application.
 //
 // It is considerably cheap to create new sessions and transactions,
@@ -32,12 +34,12 @@ func (n *Pool) Get(mode neo4j.AccessMode, bookmarks ...string) (neo4j.Session, e
 	return n.Dial(n.Driver, mode, bookmarks...)
 }
 
-// Get returns a session (neo4j.AccessModeWrite) from neo4j.Driver.
+// GetWriteMode returns a session with neo4j.AccessModeWrite from neo4j.Driver.
 func (n *Pool) GetWriteMode(bookmarks ...string) (neo4j.Session, error) {
 	return n.Dial(n.Driver, neo4j.AccessModeWrite, bookmarks...)
 }
 
-// Get returns a session (neo4j.AccessModeRead) from neo4j.Driver.
+// GetReadMode returns a session with neo4j.AccessModeRead from neo4j.Driver.
 func (n *Pool) GetReadMode(bookmarks ...string) (neo4j.Session, error) {
 	return n.Dial(n.Driver, neo4j.AccessModeRead, bookmarks...)
 }

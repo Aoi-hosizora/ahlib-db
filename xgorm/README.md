@@ -5,9 +5,9 @@
 #### Normal
 
 + `const DefaultDeletedAtTimestamp string`
-+ `HookDeletedAtField(db *gorm.DB, deletedAtTimestamp string)`
-+ `type GormTime struct {}`
++ `type GormTime3 struct {}`
 + `type GormTime2 struct {}`
++ `HookDeletedAt(db *gorm.DB, deletedAtTimestamp string)`
 + `type SilenceLogger struct{}`
 + `NewSilenceLogger() *GormSilenceLogger`
 + `type LogrusLogger struct {}`
