@@ -1,8 +1,6 @@
 package xgorm
 
 import (
-	"github.com/Aoi-hosizora/ahlib/xproperty"
-	"github.com/Aoi-hosizora/ahlib/xtesting"
 	"github.com/jinzhu/gorm"
 	"github.com/sirupsen/logrus"
 	"log"
@@ -82,22 +80,22 @@ func TestOthers(t *testing.T) {
 	log.Println(rdb.Error)
 	log.Println(IsMySQLDuplicateEntryError(rdb.Error))
 
-	tt := &TblTestUnique{}
-	rdb = db.Where("id = ?", 1).First(tt)
-	log.Println(QueryErr(rdb))
-	rdb = db.Where("id = ?", 3).First(tt)
-	log.Println(QueryErr(rdb))
+	// tt := &TblTestUnique{}
+	// rdb = db.Where("id = ?", 1).First(tt)
+	// log.Println(QueryErr(rdb))
+	// rdb = db.Where("id = ?", 3).First(tt)
+	// log.Println(QueryErr(rdb))
 }
 
-func TestOrderBy(t *testing.T) {
-	dict := map[string]*xproperty.PropertyMapperValue{
-		"uid":      xproperty.NewValue(false, "uid"),
-		"username": xproperty.NewValue(false, "lastName", "firstName"),
-		"age":      xproperty.NewValue(true, "birthday"),
-	}
-
-	xtesting.Equal(t, OrderByFunc(dict)("uid desc,age,username"), "uid DESC, birthday DESC, lastName ASC, firstName ASC")
-	xtesting.Equal(t, OrderByFunc(dict)(""), "")
-	xtesting.Equal(t, OrderByFunc(dict)("a"), "")
-	xtesting.Equal(t, OrderByFunc(map[string]*xproperty.PropertyMapperValue{})("a"), "")
-}
+// func TestOrderBy(t *testing.T) {
+// 	dict := map[string]*xproperty.PropertyMapperValue{
+// 		"uid":      xproperty.NewValue(false, "uid"),
+// 		"username": xproperty.NewValue(false, "lastName", "firstName"),
+// 		"age":      xproperty.NewValue(true, "birthday"),
+// 	}
+//
+// 	xtesting.Equal(t, OrderByFunc(dict)("uid desc,age,username"), "uid DESC, birthday DESC, lastName ASC, firstName ASC")
+// 	xtesting.Equal(t, OrderByFunc(dict)(""), "")
+// 	xtesting.Equal(t, OrderByFunc(dict)("a"), "")
+// 	xtesting.Equal(t, OrderByFunc(map[string]*xproperty.PropertyMapperValue{})("a"), "")
+// }

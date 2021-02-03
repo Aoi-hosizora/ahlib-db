@@ -2,10 +2,9 @@ package xneo4j
 
 import (
 	"fmt"
-	"github.com/Aoi-hosizora/ahlib/xproperty"
+	// "github.com/Aoi-hosizora/ahlib/xproperty"
 	"github.com/Aoi-hosizora/ahlib/xtime"
 	"github.com/neo4j/neo4j-go-driver/neo4j"
-	"strings"
 	"time"
 )
 
@@ -140,95 +139,95 @@ func GetDuration(data interface{}) neo4j.Duration {
 	return data.(neo4j.Duration)
 }
 
-func OrderByFunc(p xproperty.PropertyDict) func(source, parent string) string {
-	return func(source, parent string) string {
-		result := make([]string, 0)
-		if source == "" {
-			return ""
-		}
-
-		sources := strings.Split(source, ",")
-		for _, src := range sources {
-			if src == "" {
-				continue
-			}
-
-			src = strings.TrimSpace(src)
-			reverse := strings.HasSuffix(src, " desc") || strings.HasSuffix(src, " DESC")
-			src = strings.Split(src, " ")[0]
-
-			dest, ok := p[src]
-			if !ok || dest == nil || len(dest.Destinations) == 0 {
-				continue
-			}
-
-			if dest.Revert {
-				reverse = !reverse
-			}
-			for _, prop := range dest.Destinations {
-				prop = parent + "." + prop
-				if !reverse {
-					prop += " ASC"
-				} else {
-					prop += " DESC"
-				}
-				result = append(result, prop)
-			}
-		}
-
-		return strings.Join(result, ", ")
-	}
-}
-
-func OrderByFunc2(p xproperty.PropertyDict, v xproperty.VariableDict) func(source string, parents ...string) string {
-	return func(source string, parents ...string) string {
-		result := make([]string, 0)
-		if source == "" {
-			return ""
-		}
-
-		sources := strings.Split(source, ",")
-		for _, src := range sources {
-			if src == "" {
-				continue
-			}
-
-			src = strings.TrimSpace(src)
-			reverse := strings.HasSuffix(src, " desc") || strings.HasSuffix(src, " DESC")
-			src = strings.Split(src, " ")[0]
-
-			dest, ok := p[src]
-			if !ok || dest == nil || len(dest.Destinations) == 0 {
-				continue
-			}
-			if len(v) == 0 {
-				return ""
-			}
-
-			if dest.Revert {
-				reverse = !reverse
-			}
-			for _, prop := range dest.Destinations {
-				idx, ok := v[prop]
-				if ok {
-					idx-- // 1 -> 0
-				} else {
-					idx = 0
-				}
-				if len(parents) < idx {
-					idx = 0
-				}
-
-				prop = parents[idx] + "." + prop
-				if !reverse {
-					prop += " ASC"
-				} else {
-					prop += " DESC"
-				}
-				result = append(result, prop)
-			}
-		}
-
-		return strings.Join(result, ", ")
-	}
-}
+// func OrderByFunc(p xproperty.PropertyDict) func(source, parent string) string {
+// 	return func(source, parent string) string {
+// 		result := make([]string, 0)
+// 		if source == "" {
+// 			return ""
+// 		}
+//
+// 		sources := strings.Split(source, ",")
+// 		for _, src := range sources {
+// 			if src == "" {
+// 				continue
+// 			}
+//
+// 			src = strings.TrimSpace(src)
+// 			reverse := strings.HasSuffix(src, " desc") || strings.HasSuffix(src, " DESC")
+// 			src = strings.Split(src, " ")[0]
+//
+// 			dest, ok := p[src]
+// 			if !ok || dest == nil || len(dest.Destinations) == 0 {
+// 				continue
+// 			}
+//
+// 			if dest.Revert {
+// 				reverse = !reverse
+// 			}
+// 			for _, prop := range dest.Destinations {
+// 				prop = parent + "." + prop
+// 				if !reverse {
+// 					prop += " ASC"
+// 				} else {
+// 					prop += " DESC"
+// 				}
+// 				result = append(result, prop)
+// 			}
+// 		}
+//
+// 		return strings.Join(result, ", ")
+// 	}
+// }
+//
+// func OrderByFunc2(p xproperty.PropertyDict, v xproperty.VariableDict) func(source string, parents ...string) string {
+// 	return func(source string, parents ...string) string {
+// 		result := make([]string, 0)
+// 		if source == "" {
+// 			return ""
+// 		}
+//
+// 		sources := strings.Split(source, ",")
+// 		for _, src := range sources {
+// 			if src == "" {
+// 				continue
+// 			}
+//
+// 			src = strings.TrimSpace(src)
+// 			reverse := strings.HasSuffix(src, " desc") || strings.HasSuffix(src, " DESC")
+// 			src = strings.Split(src, " ")[0]
+//
+// 			dest, ok := p[src]
+// 			if !ok || dest == nil || len(dest.Destinations) == 0 {
+// 				continue
+// 			}
+// 			if len(v) == 0 {
+// 				return ""
+// 			}
+//
+// 			if dest.Revert {
+// 				reverse = !reverse
+// 			}
+// 			for _, prop := range dest.Destinations {
+// 				idx, ok := v[prop]
+// 				if ok {
+// 					idx-- // 1 -> 0
+// 				} else {
+// 					idx = 0
+// 				}
+// 				if len(parents) < idx {
+// 					idx = 0
+// 				}
+//
+// 				prop = parents[idx] + "." + prop
+// 				if !reverse {
+// 					prop += " ASC"
+// 				} else {
+// 					prop += " DESC"
+// 				}
+// 				result = append(result, prop)
+// 			}
+// 		}
+//
+// 		return strings.Join(result, ", ")
+// 	}
+// }
