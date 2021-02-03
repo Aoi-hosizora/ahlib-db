@@ -9,17 +9,17 @@ import (
 	"strings"
 )
 
-// IsMySQL checks the dialect of given gorm.DB is "mysql".
+// IsMySQL checks if the dialect of given gorm.DB is "mysql".
 func IsMySQL(db *gorm.DB) bool {
 	return db.Dialect().GetName() == "mysql"
 }
 
-// IsSQLite checks the dialect of given gorm.DB is "sqlite".
+// IsSQLite checks if the dialect of given gorm.DB is "sqlite".
 func IsSQLite(db *gorm.DB) bool {
 	return db.Dialect().GetName() == "sqlite"
 }
 
-// IsPostgreSQL checks the dialect of given gorm.DB is "postgres".
+// IsPostgreSQL checks if the dialect of given gorm.DB is "postgres".
 func IsPostgreSQL(db *gorm.DB) bool {
 	return db.Dialect().GetName() == "postgres"
 }
@@ -47,7 +47,7 @@ func IsSQLiteUniqueConstraintError(err error) bool {
 	return ok && sqliteErr.ExtendedCode == SQLiteUniqueConstraintErrno
 }
 
-// IsPostgreSQLUniqueViolationError checks if err is SQLite's unique_violation.
+// IsPostgreSQLUniqueViolationError checks if err is PostgreSQL's unique_violation.
 func IsPostgreSQLUniqueViolationError(err error) bool {
 	postgresErr, ok := err.(*pq.Error)
 	return ok && postgresErr.Code == PostgreSQLUniqueViolationErrno
@@ -103,7 +103,7 @@ func DeleteErr(rdb *gorm.DB) (xstatus.DbStatus, error) {
 	return xstatus.DbSuccess, nil
 }
 
-// PropertyValue represents a po entity's property mapping rule.
+// PropertyValue represents a PO entity's property mapping rule.
 type PropertyValue struct {
 	destinations []string // mapping destinations
 	reverse      bool     // reverse order mapping
@@ -131,10 +131,10 @@ func (p *PropertyValue) Reverse() bool {
 	return p.reverse
 }
 
-// PropertyDict represents a dto-po's PropertyValue dictionary used in OrderByExpFunc.
+// PropertyDict represents a DTO-PO PropertyValue dictionary, used in GenerateOrderByExp.
 type PropertyDict map[string]*PropertyValue
 
-// GenerateOrderByExp returns a generated orderBy string by given source dto order string (split by ",") and PropertyDict.
+// GenerateOrderByExp returns a generated orderBy expresion by given source dto order string (split by ",") and PropertyDict.
 func GenerateOrderByExp(source string, dict PropertyDict) string {
 	source = strings.TrimSpace(source)
 	if source == "" {
@@ -147,7 +147,7 @@ func GenerateOrderByExp(source string, dict PropertyDict) string {
 		if src == "" {
 			continue
 		}
-		srcSp := strings.Split(src, " ") // xxx asc / yyy desc
+		srcSp := strings.Split(src, " ") // xxx / yyy asc / zzz desc
 		if len(srcSp) > 2 {
 			continue
 		}
@@ -163,21 +163,13 @@ func GenerateOrderByExp(source string, dict PropertyDict) string {
 			desc = !desc
 		}
 		for _, prop := range value.destinations {
+			direction := " ASC"
 			if !desc {
-				prop += " ASC"
-			} else {
-				prop += " DESC"
+				direction = " DESC"
 			}
-			result = append(result, prop)
+			result = append(result, prop+direction)
 		}
 	}
 
 	return strings.Join(result, ", ")
-}
-
-// GenerateOrderByFunc returns a function to generate orderBy string by given PropertyDict, see GenerateOrderByExp.
-func GenerateOrderByFunc(dict PropertyDict) func(source string) string {
-	return func(source string) string {
-		return GenerateOrderByExp(source, dict)
-	}
 }

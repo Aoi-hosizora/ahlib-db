@@ -1,12 +1,6 @@
 package xgorm
 
-import (
-	"github.com/jinzhu/gorm"
-	"github.com/sirupsen/logrus"
-	"log"
-	"os"
-	"testing"
-)
+/*
 
 type TblTest struct {
 	Id   uint64
@@ -86,6 +80,8 @@ func TestOthers(t *testing.T) {
 	// rdb = db.Where("id = ?", 3).First(tt)
 	// log.Println(QueryErr(rdb))
 }
+
+*/
 
 // func TestOrderBy(t *testing.T) {
 // 	dict := map[string]*xproperty.PropertyMapperValue{

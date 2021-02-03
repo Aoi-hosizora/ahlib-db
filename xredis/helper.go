@@ -1,89 +1,76 @@
 package xredis
 
 import (
-	"fmt"
-	"github.com/gomodule/redigo/redis"
+	"context"
+	"errors"
+	"github.com/go-redis/redis/v8"
+	"time"
 )
 
-// Helper is an extension of redis.Conn.
-type Helper struct {
-	conn redis.Conn
-}
-
-// WithDB creates a Helper with redis.Conn.
-func WithConn(conn redis.Conn) *Helper {
-	return &Helper{conn: conn}
-}
-
-// GetDB gets the original redis.Conn.
-func (h *Helper) GetConn() redis.Conn {
-	return h.conn
-}
-
-// DeleteAll: KEYS xxx -> DEL xxx
-func (h *Helper) DeleteAll(pattern string) (total int, del int, err error) {
-	keys, err := redis.Strings(h.conn.Do("KEYS", pattern))
+// DelAll deletes all keys from given pattern (KEYS -> DEL). This is an atomic operator and return err when failed.
+func DelAll(client *redis.Client, pattern string) (tot, del int, err error) {
+	keys, err := client.Keys(context.Background(), pattern).Result()
 	if err != nil {
 		return 0, 0, err
 	}
-
-	cnt := 0
-	var someErr error
-	for _, key := range keys {
-		result, err := redis.Int(h.conn.Do("DEL", key))
-		if err == nil {
-			cnt += result
-		} else if someErr == nil {
-			someErr = err
-		}
+	tot = len(keys)
+	if tot == 0 {
+		return 0, 0, nil
 	}
 
-	return len(keys), cnt, someErr
+	cnt, err := client.Del(context.Background(), keys...).Result()
+	if err != nil {
+		return 0, 0, err
+	}
+	return tot, int(cnt), nil
 }
 
-// SetAll: SET xxx
-func (h *Helper) SetAll(keys []string, values []string) (total int, add int, err error) {
-	cnt := 0
-	if len(keys) != len(values) {
-		return 0, 0, fmt.Errorf("the length of keys and values is different")
+var (
+	errDifferentKeyValueLength    = errors.New("xredis: different length of keys and values")
+	errDifferentKeyValueExpLength = errors.New("xredis: different length of keys, values and expirations")
+)
+
+// SetAll sets all given key-value pairs (SET -> SET -> ...). This is a non-atomic operator, that means if there is a value failed to set,
+// no rollback will be done, and it will return the current added count and error value.
+func SetAll(client *redis.Client, keys, values []string) (tot, add int, err error) {
+	tot = len(keys)
+	if tot != len(values) {
+		return 0, 0, errDifferentKeyValueLength
 	}
 
 	var someErr error
-	for idx := range keys {
-		key := keys[idx]
-		value := values[idx]
-
-		_, err := h.conn.Do("SET", key, value)
+	for idx, key := range keys {
+		val := values[idx]
+		err := client.Set(context.Background(), key, val, 0).Err()
 		if err == nil {
-			cnt++
+			add++
 		} else if someErr == nil {
 			someErr = err
 		}
 	}
 
-	return len(keys), cnt, someErr
+	return tot, add, someErr
 }
 
-// SetExAll: SET xxx yyy
-func (h *Helper) SetExAll(keys []string, values []string, exs []int64) (total int, add int, err error) {
-	cnt := 0
-	if len(keys) != len(values) && len(keys) != len(exs) {
-		return 0, 0, fmt.Errorf("the length of keys, values and exs is different")
+// SetExAll sets all given key-value-expiration pairs (SET -> SET -> ...), equals to SetAll with expiration. This is a non-atomic operator,
+// that means if there is a value failed to set, no rollback will be done, and it will return the current added count and error value.
+func SetExAll(client *redis.Client, keys, values []string, expirations []int64) (tot, add int, err error) {
+	tot = len(keys)
+	if tot != len(values) && tot != len(expirations) {
+		return 0, 0, errDifferentKeyValueExpLength
 	}
 
 	var someErr error
-	for idx := range keys {
-		key := keys[idx]
-		value := values[idx]
-		ex := exs[idx]
-
-		_, err := h.conn.Do("SET", key, value, ex)
+	for idx, key := range keys {
+		val := values[idx]
+		ex := expirations[idx]
+		err := client.Set(context.Background(), key, val, time.Duration(ex)).Err()
 		if err == nil {
-			cnt++
+			add++
 		} else if someErr == nil {
 			someErr = err
 		}
 	}
 
-	return len(keys), cnt, someErr
+	return tot, add, someErr
 }

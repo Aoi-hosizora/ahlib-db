@@ -1,13 +1,6 @@
 package xredis
 
-import (
-	"github.com/gomodule/redigo/redis"
-	"github.com/sirupsen/logrus"
-	"log"
-	"os"
-	"sync"
-	"testing"
-)
+/*
 
 func TestLogrus(t *testing.T) {
 	conn, err := redis.Dial("tcp", "localhost:6379", redis.DialPassword("123"), redis.DialDatabase(1))
@@ -64,3 +57,5 @@ func TestMutex(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+*/

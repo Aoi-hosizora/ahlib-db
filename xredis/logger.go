@@ -1,15 +1,51 @@
 package xredis
 
 import (
-	"fmt"
-	"github.com/gomodule/redigo/redis"
-	"github.com/sirupsen/logrus"
+	"context"
+	"github.com/go-redis/redis/v8"
 	"log"
-	"reflect"
-	"runtime"
-	"strings"
 	"time"
 )
+
+type Logger struct{}
+
+var _ redis.Hook = &Logger{}
+
+const (
+	_startTimeKey = "XREDIS_PROCESS_START_TIME" // key for logger start time
+)
+
+func (l *Logger) BeforeProcess(ctx context.Context, _ redis.Cmder) (context.Context, error) {
+	return context.WithValue(ctx, _startTimeKey, time.Now()), nil
+}
+
+func (l *Logger) AfterProcess(ctx context.Context, cmd redis.Cmder) error {
+	endTime := time.Now()
+	startTimeI := ctx.Value(_startTimeKey)
+	startTime, ok := startTimeI.(time.Time)
+	if !ok {
+		return nil // ignore
+	}
+
+	log.Printf("[Redis] %s | %s", cmd.String(), endTime.Sub(startTime).String()) // TODO
+	return nil
+}
+
+func (l *Logger) BeforeProcessPipeline(ctx context.Context, cmds []redis.Cmder) (context.Context, error) {
+	return ctx, nil
+}
+
+func (l *Logger) AfterProcessPipeline(ctx context.Context, cmds []redis.Cmder) error {
+	return nil
+}
+
+func Test() {
+	redis.SetLogger(nil)
+	client := redis.Client{}
+	client.AddHook(&Logger{})
+}
+
+/*
 
 // LogrusRedis logs redis using logrus.Logger.
 type LogrusRedis struct {
@@ -154,3 +190,6 @@ func renderReply(reply interface{}) (cnt int, t string) {
 	}
 	return
 }
+
+
+*/

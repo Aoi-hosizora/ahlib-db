@@ -4,6 +4,9 @@
 
 + github.com/Aoi-hosizora/ahlib
 + github.com/jinzhu/gorm
++ github.com/go-sql-driver/mysql
++ github.com/mattn/go-sqlite3
++ github.com/lib/pq
 
 ## Documents
 
@@ -40,7 +43,6 @@
 + `func DeleteErr(rdb *gorm.DB) (xstatus.DbStatus, error)`
 + `func NewPropertyValue(reverse bool, destinations ...string) *PropertyValue`
 + `func GenerateOrderByExp(source string, dict PropertyDict) string`
-+ `func GenerateOrderByFunc(dict PropertyDict) func(source string) string`
 
 ### Methods
 

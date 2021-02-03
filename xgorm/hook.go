@@ -42,7 +42,7 @@ func HookDeletedAt(db *gorm.DB, deletedAtTimestamp string) {
 		Before("gorm:update").
 		Register("new_deleted_at_before_update_callback", deletedAtQueryUpdateCallback(deletedAtTimestamp))
 
-	// delete !!!
+	// delete <<<
 	db.Callback().Delete().
 		Replace("gorm:delete", deletedAtDeleteCallback(deletedAtTimestamp))
 }

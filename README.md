@@ -27,6 +27,6 @@
 + `github.com/go-sql-driver/mysql v1.5.0`
 + `github.com/mattn/go-sqlite3 v1.14.0`
 + `github.com/lib/pq v1.1.1`
-+ `github.com/gomodule/redigo/redis v0.0.0-20200429221454-e14091dffc1b`
-+ `github.com/neo4j/neo4j-go-driver v1.8.1`
++ `github.com/go-redis/redis/v8 v8.4.11`
++ `github.com/neo4j/neo4j-go-driver v1.8.3`
 + `github.com/sirupsen/logrus v1.7.0`
