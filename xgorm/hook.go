@@ -96,7 +96,7 @@ func deletedAtDeleteCallback(deletedAtTimestamp string) func(scope *gorm.Scope) 
 				quotedFieldName = scope.Quote(deletedAtField.DBName)
 				isNullCond      = fmt.Sprintf("%s IS NULL", quotedFieldName)
 				equalCond       = fmt.Sprintf("%s = '%s'", quotedFieldName, deletedAtTimestamp)
-				combCond        = strings.Replace(scope.CombinedConditionSql(), isNullCond, equalCond, 1)
+				combCond        = strings.ReplaceAll(scope.CombinedConditionSql(), isNullCond, equalCond)
 			)
 			sql := fmt.Sprintf(
 				"UPDATE %v SET %v='%v'%v%v",

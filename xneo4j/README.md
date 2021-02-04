@@ -56,10 +56,3 @@
 + `func (p *Pool) Target() url.URL`
 + `func (p *Pool) VerifyConnectivity() error`
 + `func (p *Pool) Close() error`
-
----
-
-+ `type LogrusNeo4j struct {}`
-+ `NewLogrusNeo4j(session neo4j.Session, logger *logrus.Logger, logMode bool) *LogrusNeo4j`
-+ `type LoggerNeo4j struct {}`
-+ `NewLoggerNeo4j(session neo4j.Session, logger *log.Logger, logMode bool) *LoggerNeo4j`

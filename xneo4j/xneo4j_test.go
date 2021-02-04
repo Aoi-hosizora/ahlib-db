@@ -1,5 +1,14 @@
 package xneo4j
 
+import (
+	"github.com/neo4j/neo4j-go-driver/neo4j"
+	"github.com/sirupsen/logrus"
+	"log"
+	"os"
+	"testing"
+	"time"
+)
+
 /*
 
 func TestLogrus(t *testing.T) {
@@ -69,22 +78,36 @@ func TestLogger(t *testing.T) {
 
 */
 
-// func TestOrderBy(t *testing.T) {
-// 	m := xproperty.PropertyDict{
-// 		"a": xproperty.NewValue(false, "at"),
-// 		"b": xproperty.NewValue(false, "bt1", "bt2"),
-// 		"c": xproperty.NewValue(true, "ct"),
-// 	}
-// 	p := xproperty.VariableDict{"at": 1, "bt1": 2, "bt2": 1, "ct": 2}
-//
-// 	xtesting.Equal(t, OrderByFunc(m)("a asc, b desc, c asc", "o"), "o.at ASC, o.bt1 DESC, o.bt2 DESC, o.ct DESC")
-// 	xtesting.Equal(t, OrderByFunc(m)("", ""), "")
-// 	xtesting.Equal(t, OrderByFunc(m)("h", ""), "")
-// 	xtesting.Equal(t, OrderByFunc(xproperty.PropertyDict{})("", ""), "")
-//
-// 	xtesting.Equal(t, OrderByFunc2(m, p)("a asc, b desc, c asc", "r1", "n1"), "r1.at ASC, n1.bt1 DESC, r1.bt2 DESC, n1.ct DESC")
-// 	xtesting.Equal(t, OrderByFunc2(m, p)(""), "")
-// 	xtesting.Equal(t, OrderByFunc2(m, p)("h"), "")
-// 	xtesting.Equal(t, OrderByFunc2(xproperty.PropertyDict{}, xproperty.VariableDict{})(""), "")
-//
-// }
+func TestXXX(t *testing.T) {
+	driver, err := neo4j.NewDriver("bolt://localhost:7687", neo4j.BasicAuth("neo4j", "123", ""))
+	if err != nil {
+		log.Fatalln(1, err)
+	}
+	session, err := driver.Session(neo4j.AccessModeRead)
+	if err != nil {
+		log.Fatalln(2, err)
+	}
+
+	l1 := logrus.New()
+	l1.SetFormatter(&logrus.TextFormatter{ForceColors: true, FullTimestamp: true, TimestampFormat: time.RFC3339})
+	l2 := log.New(os.Stderr, "", log.LstdFlags)
+	session = NewLogrusLogger(session, l1, WithSkip(2))
+	session = NewLoggerLogger(session, l2)
+
+	result, err := session.Run(`match (n {uid: 8}) return n limit 1`, nil)
+	if err != nil {
+		// Connection error: dial tcp [::1]:7688: connectex: No connection could be made because the target machine actively refused it.
+		log.Fatalln(3, err)
+	}
+	summary, err := result.Summary()
+	if err != nil {
+		// Server error: [Neo.ClientError.Statement.SyntaxError] Invalid input 'n' (line 1, column 26 (offset: 25))
+		log.Fatalln(4, err)
+	}
+	record, err := neo4j.Single(result, err)
+	if err != nil {
+		log.Fatalln(5, err)
+	}
+	log.Println(summary.ResultAvailableAfter(), summary.ResultConsumedAfter())
+	log.Println(record.GetByIndex(0).(neo4j.Node).Props())
+}

@@ -4,15 +4,13 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"github.com/sirupsen/logrus"
-	"log"
 	"reflect"
 	"regexp"
 	"strings"
 	"time"
 )
 
-// SilenceLogger can hide SQL logs and INFO logs.
-// Tips: Default `SetLogMode(false)` will hide only SQL log.
+// SilenceLogger hides "SQL" and "INFO" logs. Note that `gorm.DB.LogMode(false)` will only hide "SQL" message.
 type SilenceLogger struct{}
 
 // NewSilenceLogger creates a new SilenceLogger.
@@ -20,97 +18,104 @@ func NewSilenceLogger() *SilenceLogger {
 	return &SilenceLogger{}
 }
 
-func (g *SilenceLogger) Print(...interface{}) {}
-
-// LogrusLogger logs SQL and INFO message using logrus.Logger.
+// LogrusLogger logs "SQL" and "INFO" message to logrus.Logger.
 type LogrusLogger struct {
 	logger *logrus.Logger
 }
 
-// NewLogrusLogger creates a new LogrusLogger with logrus.Logger.
+// NewLogrusLogger creates a new LogrusLogger using given logrus.Logger.
 func NewLogrusLogger(logger *logrus.Logger) *LogrusLogger {
 	return &LogrusLogger{logger: logger}
 }
 
-// See gorm.LogFormatter for details.
+// LoggerLogger logs "SQL" and "INFO" message to logrus.StdLogger.
+type LoggerLogger struct {
+	logger logrus.StdLogger
+}
+
+// NewLoggerLogger creates a new LoggerLogger using given logrus.StdLogger.
+func NewLoggerLogger(logger logrus.StdLogger) *LoggerLogger {
+	return &LoggerLogger{logger: logger}
+}
+
+// Print does nothing for log.
+func (g *SilenceLogger) Print(...interface{}) {}
+
+// Print logs to logrus.Logger, see gorm.LogFormatter for details.
 func (g *LogrusLogger) Print(v ...interface{}) {
 	if len(v) <= 1 {
 		return
 	}
 
-	// info
-	if len(v) == 2 {
-		g.logger.WithFields(logrus.Fields{
-			"module": "gorm",
-			"type":   v[0],
-			"info":   v[1],
-		}).Infof(fmt.Sprintf("[Gorm] %v", v[1]))
-		return
-	}
-
-	// sql
-	if v[0] == "sql" {
-		source := v[1]
-		duration := v[2]
-		sql := render(v[3].(string), v[4])
-		rows := v[5]
-		g.logger.WithFields(logrus.Fields{
-			"module":   "gorm",
-			"type":     "sql",
-			"source":   source,
-			"duration": duration,
-			"sql":      sql,
-			"rows":     rows,
-		}).Info(fmt.Sprintf("[Gorm] #: %4d | %12s | %s | %s", rows, duration, sql, source))
-		return
-	}
-
-	// other
-	msg := fmt.Sprint(v[2:]...)
-	g.logger.WithFields(logrus.Fields{
-		"module":  "gorm",
-		"type":    v[0],
-		"message": msg,
-	}).Info(fmt.Sprintf("[Gorm] [%s] %s", v[0], msg))
+	// info & sql & ...
+	msg, fields := formatLoggerAndFields(v)
+	g.logger.WithFields(fields).Info(msg)
 }
 
-// StdLogLogger logs SQL and INFO message using log.Logger.
-type StdLogLogger struct {
-	logger *log.Logger
-}
-
-// NewStdLogLogger creates a new StdLogLogger with log.Logger.
-func NewStdLogLogger(logger *log.Logger) *StdLogLogger {
-	return &StdLogLogger{logger: logger}
-}
-
-func (g *StdLogLogger) Print(v ...interface{}) {
+// Print logs to logrus.StdLogger, see gorm.LogFormatter for details.
+func (g *LoggerLogger) Print(v ...interface{}) {
 	if len(v) <= 1 {
 		return
 	}
 
-	if len(v) == 2 {
-		g.logger.Printf("[Gorm] %v", v[1])
-		return
-	}
-
-	if v[0] == "sql" {
-		source := v[1]
-		duration := v[2]
-		sql := render(v[3].(string), v[4])
-		rows := v[5]
-		g.logger.Printf("[Gorm] #: %4d | %12s | %s | %s", rows, duration, sql, source)
-		return
-	}
-
-	g.logger.Printf("[Gorm] %s", fmt.Sprint(v[2:]...))
+	// info & sql & ...
+	msg, _ := formatLoggerAndFields(v)
+	g.logger.Print(msg)
 }
 
-var sqlRegexp = regexp.MustCompile(`(\$\d+)|\?`)
+// formatLoggerAndFields formats interface{}-s to logger string and logrus.Fields.
+// Logs like:
+// 	[Gorm] xxx
+func formatLoggerAndFields(v []interface{}) (string, logrus.Fields) {
+	var msg string
+	var fields logrus.Fields
 
-func render(sql string, param interface{}) string {
+	if len(v) == 2 {
+		// info
+		fields = logrus.Fields{
+			"module": "gorm",
+			"type":   v[0],
+			"info":   v[1],
+		}
+		msg = fmt.Sprintf("[Gorm] %v", v[1])
+	} else if v[0] != "sql" {
+		// other
+		s := fmt.Sprint(v[2:]...)
+		fields = logrus.Fields{
+			"module":  "gorm",
+			"type":    v[0],
+			"message": s,
+		}
+		msg = fmt.Sprintf("[Gorm] [%v] %v", v[0], s)
+	} else {
+		// sql
+		source := v[1]
+		duration := v[2].(time.Duration)
+		sql := render(v[3].(string), v[4].([]interface{}))
+		rows := v[5].(int64)
+
+		fields = logrus.Fields{
+			"module":   "gorm",
+			"type":     "sql",
+			"sql":      sql,
+			"rows":     rows,
+			"duration": duration,
+			"source":   source,
+		}
+		msg = fmt.Sprintf("[Gorm] #: %4d | %12s | %s | %s", rows, duration, sql, source)
+	}
+
+	return msg, fields
+}
+
+var (
+	_sqlRegexp = regexp.MustCompile(`(\$\d+)|\?`) // used in render
+)
+
+// render renders sql string and parameters to complete sql expression.
+func render(sql string, params []interface{}) string {
 	values := make([]interface{}, 0)
-	for _, value := range param.([]interface{}) {
+	for _, value := range params {
 		indirectValue := reflect.Indirect(reflect.ValueOf(value))
 		if indirectValue.IsValid() { // valid
 			value = indirectValue.Interface()
@@ -132,6 +137,6 @@ func render(sql string, param interface{}) string {
 		}
 	}
 
-	result := fmt.Sprintf(sqlRegexp.ReplaceAllString(sql, "%v"), values...)
+	result := fmt.Sprintf(_sqlRegexp.ReplaceAllString(sql, "%v"), values...)
 	return strings.TrimSpace(result)
 }

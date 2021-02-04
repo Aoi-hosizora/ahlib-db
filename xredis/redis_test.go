@@ -1,5 +1,14 @@
 package xredis
 
+import (
+	"context"
+	"github.com/go-redis/redis/v8"
+	"github.com/sirupsen/logrus"
+	"log"
+	"testing"
+	"time"
+)
+
 /*
 
 func TestLogrus(t *testing.T) {
@@ -59,3 +68,17 @@ func TestMutex(t *testing.T) {
 }
 
 */
+
+func TestXXX(t *testing.T) {
+	client := redis.NewClient(&redis.Options{
+		Addr:     "127.0.0.1:6379",
+		Password: "123",
+		DB:       1,
+	})
+	l := logrus.New()
+	l.SetFormatter(&logrus.TextFormatter{ForceColors: true, FullTimestamp: true, TimestampFormat: time.RFC3339})
+	client.AddHook(NewLogrusLogger(l))
+	log.Println(client.Set(context.Background(), "a", "test", 0).Result())
+	log.Println(client.Get(context.Background(), "a").Result())
+	log.Println(client.Scan(context.Background(), 0, "", 10).Result())
+}

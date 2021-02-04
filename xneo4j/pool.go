@@ -36,7 +36,7 @@ const (
 // Also see neo4j.NewDriver, neo4j.Config, neo4j.SessionConfig.
 //
 // Example:
-//	driver, _ := neo4j.NewDriver(uri, neo4j.BasicAuth(username, password), func(config *neo4j.Config) {
+//	driver, _ := neo4j.NewDriver(uri, neo4j.BasicAuth(username, password, realm), func(config *neo4j.Config) {
 // 		config.MaxConnectionPoolSize = 10
 // 	})
 // 	pool := xneo4j.NewPool(driver, func(driver neo4j.Driver, accessMode neo4j.AccessMode, bookmarks ...string) (neo4j.Session, error) {

@@ -2,194 +2,203 @@ package xredis
 
 import (
 	"context"
+	"fmt"
 	"github.com/go-redis/redis/v8"
-	"log"
+	"github.com/sirupsen/logrus"
+	"runtime"
+	"strings"
 	"time"
 )
 
-type Logger struct{}
-
-var _ redis.Hook = &Logger{}
-
 const (
-	_startTimeKey = "XREDIS_PROCESS_START_TIME" // key for logger start time
+	_startTimeKey = "XREDIS_PROCESS_START_TIME" // key for process start time
 )
 
-func (l *Logger) BeforeProcess(ctx context.Context, _ redis.Cmder) (context.Context, error) {
+// LogrusLogger logs redis command executing message to logrus.Logger.
+type LogrusLogger struct {
+	logger *logrus.Logger
+}
+
+var _ redis.Hook = &LogrusLogger{}
+
+// NewLogrusLogger creates a new LogrusLogger using given logrus.Logger.
+func NewLogrusLogger(logger *logrus.Logger) *LogrusLogger {
+	return &LogrusLogger{logger: logger}
+}
+
+// LoggerLogger logs redis command executing message to logrus.StdLogger.
+type LoggerLogger struct {
+	logger logrus.StdLogger
+}
+
+var _ redis.Hook = &LoggerLogger{}
+
+// NewLoggerLogger creates a new LoggerLogger using given logrus.StdLogger.
+func NewLoggerLogger(logger logrus.StdLogger) *LoggerLogger {
+	return &LoggerLogger{logger: logger}
+}
+
+func (l *LogrusLogger) BeforeProcessPipeline(ctx context.Context, _ []redis.Cmder) (context.Context, error) {
+	return ctx, nil
+}
+
+func (l *LogrusLogger) AfterProcessPipeline(context.Context, []redis.Cmder) error {
+	return nil
+}
+
+// BeforeProcess saves start time to context, used in AfterProcess.
+func (l *LogrusLogger) BeforeProcess(ctx context.Context, _ redis.Cmder) (context.Context, error) {
 	return context.WithValue(ctx, _startTimeKey, time.Now()), nil
 }
 
-func (l *Logger) AfterProcess(ctx context.Context, cmd redis.Cmder) error {
+// AfterProcess logs to logrus.Logger.
+func (l *LogrusLogger) AfterProcess(ctx context.Context, cmd redis.Cmder) error {
 	endTime := time.Now()
-	startTimeI := ctx.Value(_startTimeKey)
-	startTime, ok := startTimeI.(time.Time)
+	startTime, ok := ctx.Value(_startTimeKey).(time.Time)
 	if !ok {
 		return nil // ignore
 	}
 
-	log.Printf("[Redis] %s | %s", cmd.String(), endTime.Sub(startTime).String()) // TODO
+	_, file, line, _ := runtime.Caller(4)
+	source := fmt.Sprintf("%s:%d", file, line)
+	msg, fields, isErr := formatLoggerAndFields(cmd, endTime.Sub(startTime), source)
+	if isErr {
+		l.logger.WithFields(fields).Error(msg)
+	} else {
+		l.logger.WithFields(fields).Info(msg)
+	}
+
 	return nil
 }
 
-func (l *Logger) BeforeProcessPipeline(ctx context.Context, cmds []redis.Cmder) (context.Context, error) {
+func (l *LoggerLogger) BeforeProcessPipeline(ctx context.Context, _ []redis.Cmder) (context.Context, error) {
 	return ctx, nil
 }
 
-func (l *Logger) AfterProcessPipeline(ctx context.Context, cmds []redis.Cmder) error {
+func (l *LoggerLogger) AfterProcessPipeline(context.Context, []redis.Cmder) error {
 	return nil
 }
 
-func Test() {
-	redis.SetLogger(nil)
-	client := redis.Client{}
-	client.AddHook(&Logger{})
+// BeforeProcess saves start time to context, used in AfterProcess.
+func (l *LoggerLogger) BeforeProcess(ctx context.Context, _ redis.Cmder) (context.Context, error) {
+	return context.WithValue(ctx, _startTimeKey, time.Now()), nil
 }
 
-/*
-
-// LogrusRedis logs redis using logrus.Logger.
-type LogrusRedis struct {
-	redis.Conn
-	logger  *logrus.Logger
-	LogMode bool
-	Skip    int // default skip is 2
-}
-
-// NewLogrusRedis creates a new LogrusRedis with logrus.Logger.
-func NewLogrusRedis(conn redis.Conn, logger *logrus.Logger, logMode bool) *LogrusRedis {
-	return &LogrusRedis{Conn: conn, logger: logger, LogMode: logMode, Skip: 2}
-}
-
-// WithSkip sets LogrusRedis's Skip.
-func (l *LogrusRedis) WithSkip(skip int) *LogrusRedis {
-	l.Skip = skip
-	return l
-}
-
-func (l *LogrusRedis) Do(commandName string, args ...interface{}) (interface{}, error) {
-	s := time.Now()
-	reply, err := l.Conn.Do(commandName, args...)
-	e := time.Now()
-
-	if l.LogMode {
-		l.print(reply, err, commandName, e.Sub(s).String(), args...)
+// AfterProcess logs to logrus.StdLogger.
+func (l *LoggerLogger) AfterProcess(ctx context.Context, cmd redis.Cmder) error {
+	endTime := time.Now()
+	startTime, ok := ctx.Value(_startTimeKey).(time.Time)
+	if !ok {
+		return nil // ignore
 	}
 
-	return reply, err
-}
-
-func (l *LogrusRedis) print(reply interface{}, err error, commandName string, du string, v ...interface{}) {
-	cmd := renderCommand(commandName, v)
-	_, file, line, _ := runtime.Caller(l.Skip)
+	_, file, line, _ := runtime.Caller(4)
 	source := fmt.Sprintf("%s:%d", file, line)
+	msg, _, _ := formatLoggerAndFields(cmd, endTime.Sub(startTime), source)
+	l.logger.Print(msg)
 
-	if err != nil {
-		l.logger.WithFields(logrus.Fields{
-			"module":  "redis",
-			"command": cmd,
-			"error":   err,
-			"source":  source,
-		}).Error(fmt.Sprintf("[Redis] %v | %s | %s", err, cmd, source))
-		return
-	}
-	if cmd == "" {
-		return
-	}
-
-	cnt, t := renderReply(reply)
-	l.logger.WithFields(logrus.Fields{
-		"module":   "redis",
-		"command":  cmd,
-		"count":    cnt,
-		"duration": du,
-		"source":   source,
-	}).Info(fmt.Sprintf("[Redis] #: %3d | %12s | %15s | %s | %s", cnt, du, t, cmd, source))
+	return nil
 }
 
-// LogrusRedis logs redis using log.Logger.
-type LoggerRedis struct {
-	redis.Conn
-	logger  *log.Logger
-	LogMode bool
-	Skip    int
-}
+// formatLoggerAndFields formats redis.Cmder and time.Duration to logger string, logrus.Fields and isError flag.
+// Logs like:
+// 	[Redis] xxx
+func formatLoggerAndFields(cmd redis.Cmder, duration time.Duration, source string) (string, logrus.Fields, bool) {
+	var msg string
+	var fields logrus.Fields
+	var isErr bool
 
-// NewLoggerRedis creates a new LoggerRedis with log.Logger.
-func NewLoggerRedis(conn redis.Conn, logger *log.Logger, logMode bool) *LoggerRedis {
-	return &LoggerRedis{Conn: conn, logger: logger, LogMode: logMode, Skip: 2}
-}
-
-// WithSkip sets LoggerRedis's Skip.
-func (l *LoggerRedis) WithSkip(skip int) *LoggerRedis {
-	l.Skip = skip
-	return l
-}
-
-func (l *LoggerRedis) Do(commandName string, args ...interface{}) (interface{}, error) {
-	s := time.Now()
-	reply, err := l.Conn.Do(commandName, args...)
-	e := time.Now()
-
-	if l.LogMode {
-		l.print(reply, err, commandName, e.Sub(s).String(), args...)
-	}
-
-	return reply, err
-}
-
-func (l *LoggerRedis) print(reply interface{}, err error, commandName string, du string, v ...interface{}) {
-	cmd := renderCommand(commandName, v)
-	_, file, line, _ := runtime.Caller(l.Skip)
-	source := fmt.Sprintf("%s:%d", file, line)
-
-	if err != nil {
-		l.logger.Printf("[Redis] %v | %s | %s", err, cmd, source)
-		return
-	}
-	if cmd == "" {
-		return
-	}
-
-	cnt, t := renderReply(reply)
-	l.logger.Printf("[Redis] #: %3d | %12s | %15s | %s | %s", cnt, du, t, cmd, source)
-}
-
-func renderCommand(cmd string, args []interface{}) string {
-	out := cmd
-	for _, arg := range args {
-		out += " " + fmt.Sprintf("%v", arg)
-	}
-	return strings.TrimSpace(out)
-}
-
-func renderReply(reply interface{}) (cnt int, t string) {
-	if reply == nil {
-		cnt = 0
-		t = "<nil>"
-	} else if reply == "OK" {
-		cnt = 2
-		t = "string (OK)"
-	} else {
-		val := reflect.ValueOf(reply)
-		if val.Kind() == reflect.Slice && val.IsValid() {
-			cnt = val.Len()
-			t = val.Type().Elem().String()
-			if t == "uint8" { // byte
-				cnt = 1
-				t = "string"
-			} else if t == "interface {}" && val.Len() >= 1 {
-				t = reflect.TypeOf(val.Index(0).Interface()).String()
-				if t == "[]uint8" { // string
-					t = "string"
-				}
-			}
-		} else {
-			cnt = 1
-			t = fmt.Sprintf("%T", reply)
+	if err := cmd.Err(); err != nil {
+		// error
+		isErr = true
+		fields = logrus.Fields{
+			"module": "redis",
+			"error":  err,
+			"source": source,
 		}
+		msg = fmt.Sprintf("[Redis] %v | %s", err, source)
+	} else {
+		// result
+		sp := strings.Builder{}
+		for _, arg := range cmd.Args() {
+			if sp.Len() > 0 {
+				sp.WriteRune(' ')
+			}
+			sp.WriteString(fmt.Sprintf("%v", arg))
+		}
+		command := sp.String()
+		rows, status := parseCmd(cmd)
+
+		fields = logrus.Fields{
+			"module":   "redis",
+			"command":  command,
+			"rows":     rows,
+			"status":   status,
+			"duration": duration,
+			"source":   source,
+		}
+		msg = fmt.Sprintf("[Redis] #: %3d | %12s | %s | %s", rows, duration.String(), command, source)
 	}
-	return
+
+	return msg, fields, isErr
 }
 
+// parseCmd parses redis.Cmder to each cmd types and get rows and status if the cmd is redis.StatusCmd.
+func parseCmd(cmd redis.Cmder) (rows int, status string) {
+	switch cmd := cmd.(type) {
+	// slice
+	case *redis.IntSliceCmd:
+		rows = len(cmd.Val())
+	case *redis.StringSliceCmd:
+		rows = len(cmd.Val())
+	case *redis.BoolSliceCmd:
+		rows = len(cmd.Val())
+	case *redis.SliceCmd:
+		rows = len(cmd.Val())
+	case *redis.ZSliceCmd:
+		rows = len(cmd.Val())
+	case *redis.XMessageSliceCmd:
+		rows = len(cmd.Val())
+	case *redis.XStreamSliceCmd:
+		rows = len(cmd.Val())
+	case *redis.ScanCmd:
+		k, _ := cmd.Val()
+		rows = len(k)
+	case *redis.ClusterSlotsCmd:
+		rows = len(cmd.Val())
+	case *redis.GeoLocationCmd:
+		rows = len(cmd.Val())
+	case *redis.GeoPosCmd:
+		rows = len(cmd.Val())
+	case *redis.SlowLogCmd:
+		rows = len(cmd.Val())
+	case *redis.XInfoGroupsCmd:
+		rows = len(cmd.Val())
+	case *redis.XPendingCmd:
+		c := cmd.Val().Consumers
+		rows = len(c)
+	case *redis.XPendingExtCmd:
+		rows = len(cmd.Val())
 
-*/
+	// map
+	case *redis.StringIntMapCmd:
+		rows = len(cmd.Val())
+	case *redis.StringStringMapCmd:
+		rows = len(cmd.Val())
+	case *redis.StringStructMapCmd:
+		rows = len(cmd.Val())
+	case *redis.CommandsInfoCmd:
+		rows = len(cmd.Val())
+
+	// others
+	case *redis.StatusCmd:
+		rows = 1
+		status = cmd.Val()
+	case *redis.BoolCmd, *redis.FloatCmd, *redis.IntCmd, *redis.StringCmd, *redis.DurationCmd, *redis.TimeCmd,
+		*redis.Cmd, *redis.XInfoStreamCmd, *redis.ZWithKeyCmd:
+		rows = 1
+	default:
+		rows = 1
+	}
+	return rows, status
+}

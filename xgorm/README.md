@@ -48,12 +48,3 @@
 
 + `func (p *PropertyValue) Destinations() []string`
 + `func (p *PropertyValue) Reverse() bool`
-
----
-
-+ `type SilenceLogger struct{}`
-+ `NewSilenceLogger() *GormSilenceLogger`
-+ `type LogrusLogger struct {}`
-+ `NewLogrusLogger(logger *logrus.Logger) *GormLogrus`
-+ `type StdLogLogger struct {}`
-+ `NewStdLogLogger(logger *log.Logger) *GormLogger`
