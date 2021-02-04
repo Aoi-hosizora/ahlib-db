@@ -5,7 +5,7 @@ import (
 	"github.com/go-sql-driver/mysql"
 	"github.com/jinzhu/gorm"
 	"github.com/lib/pq"
-	"github.com/mattn/go-sqlite3"
+	_ "github.com/mattn/go-sqlite3"
 	"strings"
 )
 
@@ -15,9 +15,9 @@ func IsMySQL(db *gorm.DB) bool {
 }
 
 // IsSQLite checks if the dialect of given gorm.DB is "sqlite".
-func IsSQLite(db *gorm.DB) bool {
-	return db.Dialect().GetName() == "sqlite"
-}
+// func IsSQLite(db *gorm.DB) bool {
+// 	return db.Dialect().GetName() == "sqlite"
+// }
 
 // IsPostgreSQL checks if the dialect of given gorm.DB is "postgres".
 func IsPostgreSQL(db *gorm.DB) bool {
@@ -42,10 +42,10 @@ func IsMySQLDuplicateEntryError(err error) bool {
 }
 
 // IsSQLiteUniqueConstraintError checks if err is SQLite's ErrConstraintUnique.
-func IsSQLiteUniqueConstraintError(err error) bool {
-	sqliteErr, ok := err.(*sqlite3.Error)
-	return ok && sqliteErr.ExtendedCode == SQLiteUniqueConstraintErrno
-}
+// func IsSQLiteUniqueConstraintError(err error) bool {
+// 	sqliteErr, ok := err.(*sqlite3.Error)
+// 	return ok && sqliteErr.ExtendedCode == SQLiteUniqueConstraintErrno
+// }
 
 // IsPostgreSQLUniqueViolationError checks if err is PostgreSQL's unique_violation.
 func IsPostgreSQLUniqueViolationError(err error) bool {
@@ -68,7 +68,7 @@ func QueryErr(rdb *gorm.DB) (xstatus.DbStatus, error) {
 func CreateErr(rdb *gorm.DB) (xstatus.DbStatus, error) {
 	switch {
 	case IsMySQL(rdb) && IsMySQLDuplicateEntryError(rdb.Error),
-		IsSQLite(rdb) && IsSQLiteUniqueConstraintError(rdb.Error),
+		// IsSQLite(rdb) && IsSQLiteUniqueConstraintError(rdb.Error),
 		IsPostgreSQL(rdb) && IsPostgreSQLUniqueViolationError(rdb.Error):
 		return xstatus.DbExisted, rdb.Error // duplicate
 	case rdb.Error != nil:
@@ -81,7 +81,7 @@ func CreateErr(rdb *gorm.DB) (xstatus.DbStatus, error) {
 func UpdateErr(rdb *gorm.DB) (xstatus.DbStatus, error) {
 	switch {
 	case IsMySQL(rdb) && IsMySQLDuplicateEntryError(rdb.Error),
-		IsSQLite(rdb) && IsSQLiteUniqueConstraintError(rdb.Error),
+		// IsSQLite(rdb) && IsSQLiteUniqueConstraintError(rdb.Error),
 		IsPostgreSQL(rdb) && IsPostgreSQLUniqueViolationError(rdb.Error):
 		return xstatus.DbExisted, rdb.Error // duplicate
 	case rdb.Error != nil:

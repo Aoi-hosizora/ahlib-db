@@ -6,6 +6,8 @@ import (
 	"time"
 )
 
+// Cypher manual: https://neo4j.com/docs/cypher-manual/3.5/syntax/.
+// Neo4j go driver type: https://github.com/neo4j/neo4j-go-driver/tree/1.8.
 // Example of neo4j.Collect:
 // 	cypher := "MATCH p = ()-[r :FRIEND]->(n) RETURN r, n"
 // 	records, _ := neo4j.Collect(session.Run(cypher, nil)) // records is a slice of neo4j.Record
@@ -17,6 +19,11 @@ import (
 // 		nodeId, nodeLabels, nodeProps := node.Id(), node.Labels(), node.Props()
 // 	}
 var _ = neo4j.Collect
+
+// P represents the cypher parameter type, equals to "map[string]interface{}".
+// Example:
+// 	session.Run(`MATCH (n {id: $id}) RETURN n`, xneo4j.P{"id": 2})
+type P map[string]interface{}
 
 // GetByColumnIndex gets data from neo4j.Record-s by given row and column (return list) index, return false when index out of range.
 func GetByColumnIndex(records []neo4j.Record, row int, index int) (interface{}, bool) {
@@ -103,14 +110,14 @@ func GetTime(data interface{}) neo4j.OffsetTime {
 	return data.(neo4j.OffsetTime)
 }
 
-// GetLocalTime returns neo4j LocalTime value (neo4j.LocalTime) from given data.
-func GetLocalTime(data interface{}) neo4j.LocalTime {
-	return data.(neo4j.LocalTime)
-}
-
 // GetDateTime returns neo4j DateTime value (time.Time) from given data.
 func GetDateTime(data interface{}) time.Time {
 	return data.(time.Time)
+}
+
+// GetLocalTime returns neo4j LocalTime value (neo4j.LocalTime) from given data.
+func GetLocalTime(data interface{}) neo4j.LocalTime {
+	return data.(neo4j.LocalTime)
 }
 
 // GetLocalDateTime returns neo4j LocalDateTime value (neo4j.LocalDateTime) from given data.

@@ -94,7 +94,7 @@ func TestXXX(t *testing.T) {
 	session = NewLogrusLogger(session, l1, WithSkip(2))
 	session = NewLoggerLogger(session, l2)
 
-	result, err := session.Run(`match (n {uid: 8}) return n limit 1`, nil)
+	result, err := session.Run(`MATCH (n {uid: $uid}) RETURN n LIMIT 1`, P{"uid": 8})
 	if err != nil {
 		// Connection error: dial tcp [::1]:7688: connectex: No connection could be made because the target machine actively refused it.
 		log.Fatalln(3, err)

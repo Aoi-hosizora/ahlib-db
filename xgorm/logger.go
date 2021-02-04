@@ -8,9 +8,10 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode"
 )
 
-// SilenceLogger hides "SQL" and "INFO" logs. Note that `gorm.DB.LogMode(false)` will only hide "SQL" message.
+// SilenceLogger represents a gin.logger, hides "SQL" and "INFO" logs. Note that `gorm.DB.LogMode(false)` will only hide "SQL" message.
 type SilenceLogger struct{}
 
 // NewSilenceLogger creates a new SilenceLogger.
@@ -18,7 +19,7 @@ func NewSilenceLogger() *SilenceLogger {
 	return &SilenceLogger{}
 }
 
-// LogrusLogger logs "SQL" and "INFO" message to logrus.Logger.
+// LogrusLogger represents a gin.logger, logs "SQL" and "INFO" message to logrus.Logger.
 type LogrusLogger struct {
 	logger *logrus.Logger
 }
@@ -28,7 +29,7 @@ func NewLogrusLogger(logger *logrus.Logger) *LogrusLogger {
 	return &LogrusLogger{logger: logger}
 }
 
-// LoggerLogger logs "SQL" and "INFO" message to logrus.StdLogger.
+// LoggerLogger represents a gin.logger, logs "SQL" and "INFO" message to logrus.StdLogger.
 type LoggerLogger struct {
 	logger logrus.StdLogger
 }
@@ -65,7 +66,11 @@ func (g *LoggerLogger) Print(v ...interface{}) {
 
 // formatLoggerAndFields formats interface{}-s to logger string and logrus.Fields.
 // Logs like:
-// 	[Gorm] xxx
+// 	[Gorm] [info] registering callback `new_deleted_at_before_query_callback` from F:/Projects/ahlib-db/xgorm/hook.go:33
+// 	[Gorm] [log] Error 1146: Table 'db_test.tbl_test' doesn't exist
+// 	[Gorm]       1 |     1.9957ms | SELECT * FROM `tbl_test`   ORDER BY `tbl_test`.`id` ASC LIMIT 1 | F:/Projects/ahlib-db/xgorm/xgorm_test.go:48
+// 	      |-------| |------------| |---------------------------------------------------------------| |-------------------------------------------|
+// 	          7           12                                      ...                                                       ...
 func formatLoggerAndFields(v []interface{}) (string, logrus.Fields) {
 	var msg string
 	var fields logrus.Fields
@@ -102,41 +107,79 @@ func formatLoggerAndFields(v []interface{}) (string, logrus.Fields) {
 			"duration": duration,
 			"source":   source,
 		}
-		msg = fmt.Sprintf("[Gorm] #: %4d | %12s | %s | %s", rows, duration, sql, source)
+		msg = fmt.Sprintf("[Gorm] %7d | %12s | %s | %s", rows, duration, sql, source)
 	}
 
 	return msg, fields
 }
 
+// some regexps used in render.
 var (
-	_sqlRegexp = regexp.MustCompile(`(\$\d+)|\?`) // used in render
+	_sqlRegexp                = regexp.MustCompile(`\?`)
+	_numericPlaceHolderRegexp = regexp.MustCompile(`\$\d+`)
 )
+
+// isPrintable is a string util function used in render.
+func isPrintable(s string) bool {
+	for _, r := range s {
+		if !unicode.IsPrint(r) {
+			return false
+		}
+	}
+	return true
+}
 
 // render renders sql string and parameters to complete sql expression.
 func render(sql string, params []interface{}) string {
-	values := make([]interface{}, 0)
-	for _, value := range params {
-		indirectValue := reflect.Indirect(reflect.ValueOf(value))
-		if indirectValue.IsValid() { // valid
-			value = indirectValue.Interface()
-			if t, ok := value.(time.Time); ok { // time
-				values = append(values, fmt.Sprintf("'%v'", t.Format(time.RFC3339)))
-			} else if b, ok := value.([]byte); ok { // bytes
-				values = append(values, fmt.Sprintf("'%v'", string(b)))
-			} else if r, ok := value.(driver.Valuer); ok { // driver
-				if value, err := r.Value(); err == nil && value != nil {
-					values = append(values, fmt.Sprintf("'%v'", value))
-				} else {
-					values = append(values, "NULL")
-				}
-			} else { // other value
-				values = append(values, fmt.Sprintf("'%v'", value))
+	values := make([]string, 0, len(params))
+	for _, v := range params {
+		indirectValue := reflect.Indirect(reflect.ValueOf(v))
+		if !indirectValue.IsValid() {
+			values = append(values, "NULL")
+			continue
+		}
+
+		v = indirectValue.Interface()
+		switch value := v.(type) {
+		case time.Time:
+			if value.IsZero() {
+				values = append(values, fmt.Sprintf("'%v'", "0000-00-00 00:00:00"))
+			} else {
+				values = append(values, fmt.Sprintf("'%v'", value.Format("2006-01-02 15:04:05")))
 			}
-		} else { // invalid
+		case []byte:
+			if str := string(value); isPrintable(str) {
+				values = append(values, fmt.Sprintf("'%v'", str))
+			} else {
+				values = append(values, "'<binary>'")
+			}
+		case driver.Valuer:
+			if val, err := value.Value(); err == nil && val != nil {
+				values = append(values, fmt.Sprintf("'%v'", val))
+			} else {
+				values = append(values, "NULL")
+			}
+		case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64, bool:
+			values = append(values, fmt.Sprintf("%v", value))
+		default:
 			values = append(values, fmt.Sprintf("'%v'", value))
 		}
 	}
 
-	result := fmt.Sprintf(_sqlRegexp.ReplaceAllString(sql, "%v"), values...)
+	result := ""
+	if _numericPlaceHolderRegexp.MatchString(sql) { // \$\d+
+		result = sql
+		for idx, value := range values {
+			placeholder := fmt.Sprintf(`\$%d([^\d]|$)`, idx+1) // `\$0([^\d]|$)` || `\$0(\D)`
+			result = regexp.MustCompile(placeholder).ReplaceAllString(result, value+"$1")
+		}
+	} else {
+		for idx, val := range _sqlRegexp.Split(sql, -1) { // \?
+			result += val
+			if idx < len(values) {
+				result += values[idx]
+			}
+		}
+	}
 	return strings.TrimSpace(result)
 }

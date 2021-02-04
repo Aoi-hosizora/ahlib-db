@@ -1,16 +1,22 @@
 package xgorm
 
-/*
+import (
+	"github.com/jinzhu/gorm"
+	"github.com/sirupsen/logrus"
+	"log"
+	"testing"
+	"time"
+)
 
 type TblTest struct {
 	Id   uint64
 	Name string
 }
 
-type TblTestUnique struct {
-	Id   uint64
-	Name string `gorm:"unique_index:nk_name"`
-}
+// type TblTestUnique struct {
+// 	Id   uint64
+// 	Name string `gorm:"unique_index:nk_name"`
+// }
 
 func TestLogrus(t *testing.T) {
 	db, err := gorm.Open("mysql", "root:123@tcp(localhost:3306)/db_test?charset=utf8&parseTime=True&loc=Local")
@@ -21,19 +27,36 @@ func TestLogrus(t *testing.T) {
 	db.SingularTable(true)
 	db.LogMode(true)
 
-	db.SetLogger(NewLogrusLogger(logrus.New()))
+	l := logrus.New()
+	l.SetFormatter(&logrus.TextFormatter{ForceColors: true, FullTimestamp: true, TimestampFormat: time.RFC3339})
+	db.SetLogger(NewLogrusLogger(l))
 	HookDeletedAt(db, DefaultDeletedAtTimestamp)
+
+	db.AutoMigrate(&TblTest{})
 
 	test := &TblTest{}
 	db.Model(&TblTest{}).First(test)
 	log.Println(test)
+
 	tests := make([]*TblTest, 0)
 	db.Model(&TblTest{}).Find(&tests)
 	log.Println(tests)
-	db.Model(test).Related(test)
+
+	db.Model(&TblTest{}).Create(&TblTest{Id: 2, Name: "User2"})
+
+	test = &TblTest{}
+	db.Model(&TblTest{}).First(test)
+	log.Println(test)
+
+	tests = make([]*TblTest, 0)
+	db.Model(&TblTest{}).Find(&tests)
 	log.Println(tests)
+
+	// db.Model(test).Related(test)
+	// log.Println(tests)
 }
 
+/*
 func TestLogger(t *testing.T) {
 	db, err := gorm.Open("mysql", "root:123@tcp(localhost:3306)/db_test?charset=utf8&parseTime=True&loc=Local")
 	if err != nil {

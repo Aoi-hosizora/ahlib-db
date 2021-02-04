@@ -3,12 +3,14 @@
 ## Dependencies
 
 + github.com/go-redis/redis
++ github.com/sirupsen/logrus
 
 ## Documents
 
 ### Types
 
-+ None
++ `type LogrusLogger struct`
++ `type LoggerLogger struct`
 
 ### Variables
 
@@ -23,7 +25,10 @@
 + `func DelAll(client *redis.Client, pattern string) (tot, del int, err error)`
 + `func SetAll(client *redis.Client, keys, values []string) (tot, add int, err error)`
 + `func SetExAll(client *redis.Client, keys, values []string, expirations []int64) (tot, add int, err error)`
++ `func NewLogrusLogger(logger *logrus.Logger) *LogrusLogger`
++ `func NewLoggerLogger(logger logrus.StdLogger) *LoggerLogger`
 
 ### Methods
 
-+ None
++ `func (l *LogrusLogger) AfterProcess(ctx context.Context, cmd redis.Cmder) error`
++ `func (l *LoggerLogger) AfterProcess(ctx context.Context, cmd redis.Cmder) error`

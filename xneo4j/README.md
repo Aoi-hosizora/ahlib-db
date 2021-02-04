@@ -3,15 +3,20 @@
 ## Dependencies
 
 + github.com/neo4j/neo4j-go-driver
++ github.com/sirupsen/logrus
 
 ## Documents
 
 ### Types
 
++ `type P map`
 + `type PropertyValue struct`
 + `type PropertyDict map`
 + `type DialHandler func`
 + `type Pool struct`
++ `type LoggerOption func`
++ `type LogrusLogger struct`
++ `type LoggerLogger struct`
 
 ### Variables
 
@@ -38,13 +43,17 @@
 + `func GetPoint(data interface{}) neo4j.Point`
 + `func GetDate(data interface{}) neo4j.Date`
 + `func GetTime(data interface{}) neo4j.OffsetTime`
-+ `func GetLocalTime(data interface{}) neo4j.LocalTime`
 + `func GetDateTime(data interface{}) time.Time`
++ `func GetLocalTime(data interface{}) neo4j.LocalTime`
 + `func GetLocalDateTime(data interface{}) neo4j.LocalDateTime`
 + `func GetDuration(data interface{}) neo4j.Duration`
 + `func NewPropertyValue(reverse bool, destinations ...string) *PropertyValue`
 + `func GenerateOrderByExp(source string, dict PropertyDict) string`
 + `func NewPool(driver neo4j.Driver, dial DialHandler) *Pool`
++ `func WithSkip(skip int) LoggerOption`
++ `func WithCounterField(switcher bool) LoggerOption`
++ `func NewLogrusLogger(session neo4j.Session, logger *logrus.Logger, options ...LoggerOption) *LogrusLogger`
++ `func NewLoggerLogger(session neo4j.Session, logger logrus.StdLogger, options ...LoggerOption) *LoggerLogger`
 
 ### Methods
 
@@ -56,3 +65,5 @@
 + `func (p *Pool) Target() url.URL`
 + `func (p *Pool) VerifyConnectivity() error`
 + `func (p *Pool) Close() error`
++ `func (l *LogrusLogger) Run(cypher string, params map[string]interface{}, configurers ...func(*neo4j.TransactionConfig)) (neo4j.Result, error)`
++ `func (l *LoggerLogger) Run(cypher string, params map[string]interface{}, configurers ...func(*neo4j.TransactionConfig)) (neo4j.Result, error)`

@@ -102,7 +102,9 @@ func (l *LoggerLogger) AfterProcess(ctx context.Context, cmd redis.Cmder) error 
 
 // formatLoggerAndFields formats redis.Cmder and time.Duration to logger string, logrus.Fields and isError flag.
 // Logs like:
-// 	[Redis] xxx
+// 	[Redis]      1 |     1.9968ms | get a | F:/Projects/ahlib-db/xredis/redis_test.go:82
+// 	       |------| |------------| |-----| |--------------------------------------------|
+// 	          6           12         ...                         ...
 func formatLoggerAndFields(cmd redis.Cmder, duration time.Duration, source string) (string, logrus.Fields, bool) {
 	var msg string
 	var fields logrus.Fields
@@ -137,7 +139,7 @@ func formatLoggerAndFields(cmd redis.Cmder, duration time.Duration, source strin
 			"duration": duration,
 			"source":   source,
 		}
-		msg = fmt.Sprintf("[Redis] #: %3d | %12s | %s | %s", rows, duration.String(), command, source)
+		msg = fmt.Sprintf("[Redis] %6d | %12s | %s | %s", rows, duration.String(), command, source)
 	}
 
 	return msg, fields, isErr
