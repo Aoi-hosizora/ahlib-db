@@ -2,83 +2,115 @@ package xredis
 
 import (
 	"context"
+	"github.com/Aoi-hosizora/ahlib/xtesting"
 	"github.com/go-redis/redis/v8"
 	"github.com/sirupsen/logrus"
-	"log"
 	"testing"
 	"time"
 )
 
-/*
+const (
+	redisAddr   = "localhost:6379"
+	redisPasswd = "123"
+	redisDB     = 0
+)
 
-func TestLogrus(t *testing.T) {
-	conn, err := redis.Dial("tcp", "localhost:6379", redis.DialPassword("123"), redis.DialDatabase(1))
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	conn = NewLogrusRedis(conn, logrus.New(), true).WithSkip(3)
-	conn = NewMutexRedis(conn)
-
-	_, _ = conn.Do("GET", "aaaaa-a")
-	_, _ = conn.Do("SET", "aaaaa-a", "abc")
-	_, _ = conn.Do("SET", "aaaaa-b", "bcd")
-	_, _ = conn.Do("GET", "aaaaa-a")
-	_, _ = conn.Do("KEYS", "aaaaa-*")
-	_, _, _ = WithConn(conn).DeleteAll("aaaaa-*")
-}
-
-func TestLogger(t *testing.T) {
-	conn, err := redis.Dial("tcp", "localhost:6379", redis.DialPassword("123"), redis.DialDatabase(1))
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	conn = NewLoggerRedis(conn, log.New(os.Stderr, "", log.LstdFlags), true).WithSkip(3)
-	conn = NewMutexRedis(conn)
-
-	_, _ = conn.Do("GET", "aaaaa-a")
-	_, _ = conn.Do("SET", "aaaaa-a", "abc")
-	_, _ = conn.Do("SET", "aaaaa-b", "bcd")
-	_, _ = conn.Do("GET", "aaaaa-a")
-	_, _ = conn.Do("KEYS", "aaaaa-*")
-	_, _, _ = WithConn(conn).DeleteAll("aaaaa-*")
-}
-
-func TestMutex(t *testing.T) {
-	conn, err := redis.Dial("tcp", "localhost:6379", redis.DialPassword("123"), redis.DialDatabase(1))
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	logger := logrus.New()
-	logger.SetFormatter(&logrus.TextFormatter{})
-	conn = NewLogrusRedis(conn, logger, true).WithSkip(3)
-	conn = NewMutexRedis(conn)
-
-	wg := sync.WaitGroup{}
-	wg.Add(10)
-	for i := 0; i < 10; i++ {
-		go func() {
-			_, _ = conn.Do("GET", "aaaaa-a")
-			wg.Done()
-		}()
-	}
-	wg.Wait()
-}
-
-*/
-
-func TestXXX(t *testing.T) {
+func TestHelper(t *testing.T) {
 	client := redis.NewClient(&redis.Options{
-		Addr:     "127.0.0.1:6379",
-		Password: "123",
-		DB:       1,
+		Addr:     redisAddr,
+		Password: redisPasswd,
+		DB:       redisDB,
 	})
 	l := logrus.New()
 	l.SetFormatter(&logrus.TextFormatter{ForceColors: true, FullTimestamp: true, TimestampFormat: time.RFC3339})
+	redis.SetLogger(NewSilenceLogger())
 	client.AddHook(NewLogrusLogger(l))
-	log.Println(client.Set(context.Background(), "a", "test", 0).Result())
-	log.Println(client.Get(context.Background(), "a").Result())
-	log.Println(client.Scan(context.Background(), 0, "", 10).Result())
+
+	t.Run("DeleteAll", func(t *testing.T) {
+		client.Set(context.Background(), "test_a", "test_aaa", 0)
+		client.Set(context.Background(), "test_b", "test_bbb", 0)
+		client.Set(context.Background(), "test_c", "test_ccc", 0)
+
+		tot, del, err := DelAll(client, "test_")
+		xtesting.Equal(t, tot, 0)
+		xtesting.Equal(t, del, 0)
+		xtesting.Nil(t, err)
+		tot, del, err = DelAll(client, "test_a")
+		xtesting.Equal(t, tot, 1)
+		xtesting.Equal(t, del, 1)
+		xtesting.Nil(t, err)
+		tot, del, err = DelAll(client, "test_*")
+		xtesting.Equal(t, tot, 2)
+		xtesting.Equal(t, del, 2)
+		xtesting.Nil(t, err)
+	})
+
+	t.Run("SetAll", func(t *testing.T) {
+		for _, tc := range []struct {
+			giveKeys   []string
+			giveValues []string
+			wantOk     bool
+		}{
+			{[]string{}, []string{}, true},
+			{[]string{"k"}, []string{}, false},
+			{[]string{}, []string{"v"}, false},
+			{[]string{"test_a", "test_b", "test_c"}, []string{"test_aaa", "test_bbb", "test_ccc"}, true},
+		} {
+			tot, add, err := SetAll(client, tc.giveKeys, tc.giveValues)
+			if !tc.wantOk {
+				xtesting.NotNil(t, err)
+			} else {
+				xtesting.Nil(t, err)
+				xtesting.Equal(t, tot, len(tc.giveKeys))
+				xtesting.Equal(t, add, len(tc.giveKeys))
+				for idx := range tc.giveKeys {
+					k, v := tc.giveKeys[idx], tc.giveValues[idx]
+					xtesting.Equal(t, client.Get(context.Background(), k).Val(), v)
+				}
+			}
+		}
+	})
+
+	t.Run("SetExAll", func(t *testing.T) {
+		for _, tc := range []struct {
+			giveKeys   []string
+			giveValues []string
+			giveExs    []int64
+			wantOk     bool
+		}{
+			{[]string{}, []string{}, []int64{}, true},
+			{[]string{"k"}, []string{}, []int64{0}, false},
+			{[]string{}, []string{"v"}, []int64{0}, false},
+			{[]string{"k"}, []string{"v"}, []int64{}, false},
+			{[]string{"test_a", "test_b", "test_c"}, []string{"test_aaa", "test_bbb", "test_ccc"}, []int64{1, 1, 1}, true},
+		} {
+			tot, add, err := SetExAll(client, tc.giveKeys, tc.giveValues, tc.giveExs)
+			if !tc.wantOk {
+				xtesting.NotNil(t, err)
+			} else {
+				xtesting.Nil(t, err)
+				xtesting.Equal(t, tot, len(tc.giveKeys))
+				xtesting.Equal(t, add, len(tc.giveKeys))
+				for idx := range tc.giveKeys {
+					k, v := tc.giveKeys[idx], tc.giveValues[idx]
+					xtesting.Equal(t, client.Get(context.Background(), k).Val(), v)
+				}
+
+				maxWait := int64(-1)
+				for _, s := range tc.giveExs {
+					if s > maxWait {
+						maxWait = s
+					}
+				}
+				time.Sleep(time.Second * time.Duration(maxWait+1))
+				for idx := range tc.giveKeys {
+					xtesting.NotNil(t, client.Get(context.Background(), tc.giveKeys[idx]).Err())
+				}
+			}
+		}
+	})
+}
+
+func TestLogger(t *testing.T) {
+
 }

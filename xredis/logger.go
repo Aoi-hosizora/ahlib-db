@@ -10,11 +10,30 @@ import (
 	"time"
 )
 
+// ILogger represents neo4j's internal logger interface.
+type ILogger interface {
+	Printf(ctx context.Context, format string, v ...interface{})
+}
+
+// SilenceLogger represents a redis's logger, used to hide go-redis's info logger.
+type SilenceLogger struct{}
+
+// NewSilenceLogger creates a new SilenceLogger.
+// Example:
+// 	client := redis.NewClient(options)
+// 	redis.SetLogger(xredis.NewSilenceLogger())
+func NewSilenceLogger() *SilenceLogger {
+	return &SilenceLogger{}
+}
+
+// Printf does nothing.
+func (l *SilenceLogger) Printf(context.Context, string, ...interface{}) {}
+
 const (
 	_startTimeKey = "XREDIS_PROCESS_START_TIME" // key for process start time
 )
 
-// LogrusLogger logs redis command executing message to logrus.Logger.
+// LogrusLogger represents a redis's logger (as redis.Hook), used to log redis command executing message to logrus.Logger.
 type LogrusLogger struct {
 	logger *logrus.Logger
 }
@@ -22,11 +41,16 @@ type LogrusLogger struct {
 var _ redis.Hook = &LogrusLogger{}
 
 // NewLogrusLogger creates a new LogrusLogger using given logrus.Logger.
+// Example:
+// 	client := redis.NewClient(options)
+// 	l := logrus.New()
+// 	l.SetFormatter(&logrus.TextFormatter{})
+// 	client.AddHook(xredis.NewLogrusLogger(l))
 func NewLogrusLogger(logger *logrus.Logger) *LogrusLogger {
 	return &LogrusLogger{logger: logger}
 }
 
-// LoggerLogger logs redis command executing message to logrus.StdLogger.
+// LoggerLogger represents a redis's logger (as redis.Hook), used to log redis command executing message to logrus.StdLogger.
 type LoggerLogger struct {
 	logger logrus.StdLogger
 }
@@ -34,6 +58,10 @@ type LoggerLogger struct {
 var _ redis.Hook = &LoggerLogger{}
 
 // NewLoggerLogger creates a new LoggerLogger using given logrus.StdLogger.
+// Example:
+// 	client := redis.NewClient(options)
+// 	l := log.New(os.Stderr, "", log.LstdFlags)
+// 	client.AddHook(xredis.NewLoggerLogger(l))
 func NewLoggerLogger(logger logrus.StdLogger) *LoggerLogger {
 	return &LoggerLogger{logger: logger}
 }
@@ -102,9 +130,10 @@ func (l *LoggerLogger) AfterProcess(ctx context.Context, cmd redis.Cmder) error 
 
 // formatLoggerAndFields formats redis.Cmder and time.Duration to logger string, logrus.Fields and isError flag.
 // Logs like:
-// 	[Redis]      1 |     1.9968ms | get a | F:/Projects/ahlib-db/xredis/redis_test.go:82
-// 	       |------| |------------| |-----| |--------------------------------------------|
-// 	          6           12         ...                         ...
+// 	[Redis] dial tcp 127.0.0.1:6378: connectex: No connection could be made because the target machine actively refused it. | F:/Projects/ahlib-db/xredis/redis_test.go:59
+// 	[Redis]      1 |    25.9306ms | set 'test num' 1 | F:/Projects/ahlib-db/xredis/redis_test.go:59
+// 	       |------| |------------| |----------------| |--------------------------------------------|
+// 	          6           12               ...                               ...
 func formatLoggerAndFields(cmd redis.Cmder, duration time.Duration, source string) (string, logrus.Fields, bool) {
 	var msg string
 	var fields logrus.Fields
@@ -121,14 +150,7 @@ func formatLoggerAndFields(cmd redis.Cmder, duration time.Duration, source strin
 		msg = fmt.Sprintf("[Redis] %v | %s", err, source)
 	} else {
 		// result
-		sp := strings.Builder{}
-		for _, arg := range cmd.Args() {
-			if sp.Len() > 0 {
-				sp.WriteRune(' ')
-			}
-			sp.WriteString(fmt.Sprintf("%v", arg))
-		}
-		command := sp.String()
+		command := render(cmd.Args())
 		rows, status := parseCmd(cmd)
 
 		fields = logrus.Fields{
@@ -143,6 +165,25 @@ func formatLoggerAndFields(cmd redis.Cmder, duration time.Duration, source strin
 	}
 
 	return msg, fields, isErr
+}
+
+// render renders command parameters to complete redis command expression.
+func render(args []interface{}) string {
+	sp := strings.Builder{}
+	for idx, arg := range args {
+		if idx > 0 {
+			sp.WriteRune(' ')
+		}
+
+		argStr := ""
+		if s, ok := arg.(string); idx != 0 && ok && strings.Contains(s, " ") {
+			argStr = fmt.Sprintf("'%s'", s)
+		} else {
+			argStr = fmt.Sprintf("%v", arg)
+		}
+		sp.WriteString(argStr)
+	}
+	return sp.String()
 }
 
 // parseCmd parses redis.Cmder to each cmd types and get rows and status if the cmd is redis.StatusCmd.

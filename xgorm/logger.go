@@ -11,30 +11,50 @@ import (
 	"unicode"
 )
 
-// SilenceLogger represents a gin.logger, hides "SQL" and "INFO" logs. Note that `gorm.DB.LogMode(false)` will only hide "SQL" message.
+// ILogger represents gorm's internal logger interface.
+type ILogger interface {
+	Print(v ...interface{})
+}
+
+// SilenceLogger represents a gorm's logger, used to hide "SQL" and "INFO" logs. Note that `gorm.DB.LogMode(false)` will only hide "SQL" message.
 type SilenceLogger struct{}
 
 // NewSilenceLogger creates a new SilenceLogger.
+// Example:
+// 	db, err := gorm.Open("mysql", dsl)
+// 	db.LogMode(true) // both true and false are ok
+// 	db.SetLogger(xgorm.NewSilenceLogger())
 func NewSilenceLogger() *SilenceLogger {
 	return &SilenceLogger{}
 }
 
-// LogrusLogger represents a gin.logger, logs "SQL" and "INFO" message to logrus.Logger.
+// LogrusLogger represents a gorm's logger, used to log "SQL" and "INFO" message to logrus.Logger.
 type LogrusLogger struct {
 	logger *logrus.Logger
 }
 
 // NewLogrusLogger creates a new LogrusLogger using given logrus.Logger.
+// Example:
+// 	db, err := gorm.Open("mysql", dsl)
+// 	db.LogMode(true) // must be true
+// 	l := logrus.New()
+// 	l.SetFormatter(&logrus.TextFormatter{})
+// 	db.SetLogger(xgorm.NewLogrusLogger(l))
 func NewLogrusLogger(logger *logrus.Logger) *LogrusLogger {
 	return &LogrusLogger{logger: logger}
 }
 
-// LoggerLogger represents a gin.logger, logs "SQL" and "INFO" message to logrus.StdLogger.
+// LoggerLogger represents a gorm's logger, used to log "SQL" and "INFO" message to logrus.StdLogger.
 type LoggerLogger struct {
 	logger logrus.StdLogger
 }
 
 // NewLoggerLogger creates a new LoggerLogger using given logrus.StdLogger.
+// Example:
+// 	db, err := gorm.Open("mysql", dsl)
+// 	db.LogMode(true) // must be true
+// 	l := log.New(os.Stderr, "", log.LstdFlags)
+// 	db.SetLogger(xgorm.NewLoggerLogger(l))
 func NewLoggerLogger(logger logrus.StdLogger) *LoggerLogger {
 	return &LoggerLogger{logger: logger}
 }
@@ -66,8 +86,8 @@ func (g *LoggerLogger) Print(v ...interface{}) {
 
 // formatLoggerAndFields formats interface{}-s to logger string and logrus.Fields.
 // Logs like:
-// 	[Gorm] [info] registering callback `new_deleted_at_before_query_callback` from F:/Projects/ahlib-db/xgorm/hook.go:33
-// 	[Gorm] [log] Error 1146: Table 'db_test.tbl_test' doesn't exist
+// 	[Gorm] [info] registering callback `new_deleted_at_before_query_callback` from F:/Projects/ahlib-db/xgorm/hook.go:36
+// 	[Gorm] [log] Error 1062: Duplicate entry '1' for key 'PRIMARY'
 // 	[Gorm]       1 |     1.9957ms | SELECT * FROM `tbl_test`   ORDER BY `tbl_test`.`id` ASC LIMIT 1 | F:/Projects/ahlib-db/xgorm/xgorm_test.go:48
 // 	      |-------| |------------| |---------------------------------------------------------------| |-------------------------------------------|
 // 	          7           12                                      ...                                                       ...
@@ -115,8 +135,8 @@ func formatLoggerAndFields(v []interface{}) (string, logrus.Fields) {
 
 // some regexps used in render.
 var (
-	_sqlRegexp                = regexp.MustCompile(`\?`)
-	_numericPlaceHolderRegexp = regexp.MustCompile(`\$\d+`)
+	_placeholderRegexp        = regexp.MustCompile(`\?`)
+	_numericPlaceholderRegexp = regexp.MustCompile(`\$\d+`)
 )
 
 // isPrintable is a string util function used in render.
@@ -167,14 +187,14 @@ func render(sql string, params []interface{}) string {
 	}
 
 	result := ""
-	if _numericPlaceHolderRegexp.MatchString(sql) { // \$\d+
-		result = sql
+	if _numericPlaceholderRegexp.MatchString(sql) { // \$\d+
+		result = sql + " "
 		for idx, value := range values {
-			placeholder := fmt.Sprintf(`\$%d([^\d]|$)`, idx+1) // `\$0([^\d]|$)` || `\$0(\D)`
+			placeholder := fmt.Sprintf(`\$%d(\D)`, idx+1) // \$1(\D) X
 			result = regexp.MustCompile(placeholder).ReplaceAllString(result, value+"$1")
 		}
 	} else {
-		for idx, val := range _sqlRegexp.Split(sql, -1) { // \?
+		for idx, val := range _placeholderRegexp.Split(sql, -1) { // \?
 			result += val
 			if idx < len(values) {
 				result += values[idx]

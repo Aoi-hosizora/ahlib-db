@@ -17,6 +17,7 @@
 + `type GormTime2 struct`
 + `type PropertyValue struct`
 + `type PropertyDict map`
++ `type ILogger interface`
 + `type SilenceLogger struct`
 + `type LogrusLogger struct`
 + `type LoggerLogger struct`

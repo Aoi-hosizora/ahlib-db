@@ -1,7 +1,6 @@
 package xneo4j
 
 import (
-	"database/sql/driver"
 	"encoding/json"
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/neo4j"
@@ -9,6 +8,7 @@ import (
 	"reflect"
 	"regexp"
 	"runtime"
+	"strings"
 	"time"
 	"unicode"
 )
@@ -112,9 +112,11 @@ func (l *LoggerLogger) Run(cypher string, params map[string]interface{}, configu
 
 // formatLoggerAndFields formats given neo4j.Result, error, source and loggerOptions to logger string, logrus.Fields and isError flag.
 // Logs like:
+// 	[Neo4j] Connection error: dial tcp [::1]:7687: connectex: No connection could be made because the target machine actively refused it. | F:/Projects/ahlib-db/xneo4j/xneo4j_test.go:97
+// 	[Neo4j] Server error: [Neo.ClientError.Statement.SyntaxError] Invalid input 'n' (line 1, column 26 (offset: 25)) | F:/Projects/ahlib-db/xneo4j/xneo4j_test.go:97
 // 	[Neo4j]     -1 |        999ms | MATCH (n {uid: 8}) RETURN n LIMIT 1 | F:/Projects/ahlib-db/xneo4j/xneo4j_test.go:97
 // 	       |------| |------------| |-----------------------------------| |---------------------------------------------|
-// 	          6           12                        ...                                           ...
+// 	          6           12                        ...                                          ...
 func formatLoggerAndFields(result neo4j.Result, err error, source string, options *loggerOptions) (string, logrus.Fields, bool) {
 	var msg string
 	var fields logrus.Fields
@@ -240,12 +242,6 @@ func render(cypher string, params map[string]interface{}) string {
 			} else {
 				values[k] = "'<binary>'"
 			}
-		case driver.Valuer:
-			if val, err := value.Value(); err == nil && val != nil {
-				values[k] = fmt.Sprintf("'%v'", val)
-			} else {
-				values[k] = "NULL"
-			}
 		case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64, bool:
 			values[k] = fmt.Sprintf("%v", value)
 		default:
@@ -258,5 +254,5 @@ func render(cypher string, params map[string]interface{}) string {
 		placeholder := fmt.Sprintf(`\$%s([^\w]|$)`, k) // `\$s([^\w]|$)` || `\$s(\W)`
 		result = regexp.MustCompile(placeholder).ReplaceAllString(result, v+"$1")
 	}
-	return result
+	return strings.TrimSpace(result)
 }

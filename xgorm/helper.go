@@ -1,12 +1,12 @@
 package xgorm
 
 import (
+	"github.com/Aoi-hosizora/ahlib-db/internal/orderby"
 	"github.com/Aoi-hosizora/ahlib/xstatus"
 	"github.com/go-sql-driver/mysql"
 	"github.com/jinzhu/gorm"
 	"github.com/lib/pq"
-	_ "github.com/mattn/go-sqlite3"
-	"strings"
+	"github.com/mattn/go-sqlite3"
 )
 
 // IsMySQL checks if the dialect of given gorm.DB is "mysql".
@@ -14,10 +14,10 @@ func IsMySQL(db *gorm.DB) bool {
 	return db.Dialect().GetName() == "mysql"
 }
 
-// IsSQLite checks if the dialect of given gorm.DB is "sqlite".
-// func IsSQLite(db *gorm.DB) bool {
-// 	return db.Dialect().GetName() == "sqlite"
-// }
+// IsSQLite checks if the dialect of given gorm.DB is "sqlite3".
+func IsSQLite(db *gorm.DB) bool {
+	return db.Dialect().GetName() == "sqlite3"
+}
 
 // IsPostgreSQL checks if the dialect of given gorm.DB is "postgres".
 func IsPostgreSQL(db *gorm.DB) bool {
@@ -41,15 +41,15 @@ func IsMySQLDuplicateEntryError(err error) bool {
 	return ok && mysqlErr.Number == MySQLDuplicateEntryErrno
 }
 
-// IsSQLiteUniqueConstraintError checks if err is SQLite's ErrConstraintUnique.
-// func IsSQLiteUniqueConstraintError(err error) bool {
-// 	sqliteErr, ok := err.(*sqlite3.Error)
-// 	return ok && sqliteErr.ExtendedCode == SQLiteUniqueConstraintErrno
-// }
+// IsSQLiteUniqueConstraintError checks if err is SQLite's ErrConstraintUnique error.
+func IsSQLiteUniqueConstraintError(err error) bool {
+	sqliteErr, ok := err.(sqlite3.Error)
+	return ok && sqliteErr.ExtendedCode == SQLiteUniqueConstraintErrno
+}
 
-// IsPostgreSQLUniqueViolationError checks if err is PostgreSQL's unique_violation.
+// IsPostgreSQLUniqueViolationError checks if err is PostgreSQL's unique_violation error.
 func IsPostgreSQLUniqueViolationError(err error) bool {
-	postgresErr, ok := err.(*pq.Error)
+	postgresErr, ok := err.(pq.Error)
 	return ok && postgresErr.Code == PostgreSQLUniqueViolationErrno
 }
 
@@ -68,7 +68,7 @@ func QueryErr(rdb *gorm.DB) (xstatus.DbStatus, error) {
 func CreateErr(rdb *gorm.DB) (xstatus.DbStatus, error) {
 	switch {
 	case IsMySQL(rdb) && IsMySQLDuplicateEntryError(rdb.Error),
-		// IsSQLite(rdb) && IsSQLiteUniqueConstraintError(rdb.Error),
+		IsSQLite(rdb) && IsSQLiteUniqueConstraintError(rdb.Error),
 		IsPostgreSQL(rdb) && IsPostgreSQLUniqueViolationError(rdb.Error):
 		return xstatus.DbExisted, rdb.Error // duplicate
 	case rdb.Error != nil:
@@ -81,7 +81,7 @@ func CreateErr(rdb *gorm.DB) (xstatus.DbStatus, error) {
 func UpdateErr(rdb *gorm.DB) (xstatus.DbStatus, error) {
 	switch {
 	case IsMySQL(rdb) && IsMySQLDuplicateEntryError(rdb.Error),
-		// IsSQLite(rdb) && IsSQLiteUniqueConstraintError(rdb.Error),
+		IsSQLite(rdb) && IsSQLiteUniqueConstraintError(rdb.Error),
 		IsPostgreSQL(rdb) && IsPostgreSQLUniqueViolationError(rdb.Error):
 		return xstatus.DbExisted, rdb.Error // duplicate
 	case rdb.Error != nil:
@@ -104,72 +104,18 @@ func DeleteErr(rdb *gorm.DB) (xstatus.DbStatus, error) {
 }
 
 // PropertyValue represents a PO entity's property mapping rule.
-type PropertyValue struct {
-	destinations []string // mapping destinations
-	reverse      bool     // reverse order mapping
-}
+type PropertyValue = orderby.PropertyValue
+
+// PropertyDict represents a DTO-PO PropertyValue dictionary, used in GenerateOrderByExp.
+type PropertyDict = orderby.PropertyDict
 
 // NewPropertyValue creates a PropertyValue by given reverse and destinations.
 func NewPropertyValue(reverse bool, destinations ...string) *PropertyValue {
-	finalDestinations := make([]string, 0, len(destinations))
-	for _, dest := range destinations {
-		dest = strings.TrimSpace(dest)
-		if dest != "" {
-			finalDestinations = append(finalDestinations, dest) // filter empty destination
-		}
-	}
-	return &PropertyValue{reverse: reverse, destinations: finalDestinations}
+	return orderby.NewPropertyValue(reverse, destinations...)
 }
 
-// Destinations returns the destinations of PropertyValue.
-func (p *PropertyValue) Destinations() []string {
-	return p.destinations
-}
-
-// Reverse returns the reverse of PropertyValue.
-func (p *PropertyValue) Reverse() bool {
-	return p.reverse
-}
-
-// PropertyDict represents a DTO-PO PropertyValue dictionary, used in GenerateOrderByExp.
-type PropertyDict map[string]*PropertyValue
-
-// GenerateOrderByExp returns a generated orderBy expresion by given source dto order string (split by ",") and PropertyDict.
+// GenerateOrderByExp returns a generated orderBy expresion by given source dto order string (split by ",", such as "name desc, age asc") and PropertyDict.
+// The generated expression is in mysql-sql and neo4j-cypher style, that is "xx ASC", "xx DESC".
 func GenerateOrderByExp(source string, dict PropertyDict) string {
-	source = strings.TrimSpace(source)
-	if source == "" {
-		return ""
-	}
-
-	result := make([]string, 0)
-	for _, src := range strings.Split(source, ",") {
-		src = strings.TrimSpace(src)
-		if src == "" {
-			continue
-		}
-		srcSp := strings.Split(src, " ") // xxx / yyy asc / zzz desc
-		if len(srcSp) > 2 {
-			continue
-		}
-
-		src = srcSp[0]
-		desc := len(srcSp) == 2 && strings.ToUpper(srcSp[1]) == "DESC"
-		value, ok := dict[src] // property mapping rule
-		if !ok || value == nil || len(value.destinations) == 0 {
-			continue
-		}
-
-		if value.reverse {
-			desc = !desc
-		}
-		for _, prop := range value.destinations {
-			direction := " ASC"
-			if !desc {
-				direction = " DESC"
-			}
-			result = append(result, prop+direction)
-		}
-	}
-
-	return strings.Join(result, ", ")
+	return orderby.GenerateOrderByExp(source, dict)
 }

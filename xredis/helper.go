@@ -52,11 +52,11 @@ func SetAll(client *redis.Client, keys, values []string) (tot, add int, err erro
 	return tot, add, someErr
 }
 
-// SetExAll sets all given key-value-expiration pairs (SET -> SET -> ...), equals to SetAll with expiration. This is a non-atomic operator,
+// SetExAll sets all given key-value-expiration pairs (SET -> SET -> ...), equals to SetAll with expiration in second. This is a non-atomic operator,
 // that means if there is a value failed to set, no rollback will be done, and it will return the current added count and error value.
 func SetExAll(client *redis.Client, keys, values []string, expirations []int64) (tot, add int, err error) {
 	tot = len(keys)
-	if tot != len(values) && tot != len(expirations) {
+	if tot != len(values) || tot != len(expirations) {
 		return 0, 0, errDifferentKeyValueExpLength
 	}
 
@@ -64,11 +64,11 @@ func SetExAll(client *redis.Client, keys, values []string, expirations []int64) 
 	for idx, key := range keys {
 		val := values[idx]
 		ex := expirations[idx]
-		err := client.Set(context.Background(), key, val, time.Duration(ex)).Err()
-		if err == nil {
+		e := client.Set(context.Background(), key, val, time.Duration(ex*1e9)).Err()
+		if e == nil {
 			add++
 		} else if someErr == nil {
-			someErr = err
+			someErr = e
 		}
 	}
 

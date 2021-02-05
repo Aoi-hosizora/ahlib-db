@@ -1,120 +1,231 @@
 package xgorm
 
 import (
+	"errors"
+	"github.com/Aoi-hosizora/ahlib/xstatus"
+	"github.com/Aoi-hosizora/ahlib/xtesting"
 	"github.com/jinzhu/gorm"
+	_ "github.com/jinzhu/gorm/dialects/mysql"
+	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"github.com/sirupsen/logrus"
 	"log"
+	"os"
 	"testing"
 	"time"
 )
 
-type TblTest struct {
-	Id   uint64
-	Name string
+const (
+	mysqlDsl   = "root:123@tcp(localhost:3306)/db_test?charset=utf8&parseTime=True&loc=Local"
+	sqliteFile = "test.sql"
+)
+
+type User struct {
+	Uid  int    `gorm:"primary_key; auto_increment"`
+	Name string `gorm:"not null; unique_index:uk_name"`
+	GormTime
 }
 
-// type TblTestUnique struct {
-// 	Id   uint64
-// 	Name string `gorm:"unique_index:nk_name"`
-// }
-
-func TestLogrus(t *testing.T) {
-	db, err := gorm.Open("mysql", "root:123@tcp(localhost:3306)/db_test?charset=utf8&parseTime=True&loc=Local")
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	db.SingularTable(true)
-	db.LogMode(true)
-
+func TestHook(t *testing.T) {
 	l := logrus.New()
 	l.SetFormatter(&logrus.TextFormatter{ForceColors: true, FullTimestamp: true, TimestampFormat: time.RFC3339})
-	db.SetLogger(NewLogrusLogger(l))
-	HookDeletedAt(db, DefaultDeletedAtTimestamp)
+	check := func(db *gorm.DB, write bool) error {
+		if db.Error != nil {
+			return db.Error
+		}
+		if !write && db.RecordNotFound() {
+			return errors.New("record not found")
+		}
+		if write && db.RowsAffected == 0 {
+			return errors.New("rows affected is zero")
+		}
+		return nil
+	}
 
-	db.AutoMigrate(&TblTest{})
+	for _, tc := range []struct {
+		giveDialect string
+		giveParam   string
+	}{
+		{"mysql", mysqlDsl},
+		{"sqlite3", sqliteFile},
+	} {
+		t.Run(tc.giveDialect, func(t *testing.T) {
+			db, err := gorm.Open(tc.giveDialect, tc.giveParam)
+			if err != nil {
+				log.Println(err)
+				t.FailNow()
+			}
+			db.LogMode(true)
+			db.SetLogger(NewLogrusLogger(l))
+			HookDeletedAt(db, DefaultDeletedAtTimestamp)
+			db.DropTableIfExists(&User{})
+			if db.AutoMigrate(&User{}).Error != nil {
+				log.Println(err)
+				t.FailNow()
+			}
 
-	test := &TblTest{}
-	db.Model(&TblTest{}).First(test)
-	log.Println(test)
+			// create
+			user := &User{Uid: 1, Name: "user1"}
+			db.Model(&User{}).Create(user)
+			xtesting.Equal(t, user.DeletedAt.Format("2006-01-02 15:04:05"), DefaultDeletedAtTimestamp)
 
-	tests := make([]*TblTest, 0)
-	db.Model(&TblTest{}).Find(&tests)
-	log.Println(tests)
+			// query
+			user = &User{}
+			xtesting.Nil(t, check(db.Model(&User{}).Where(&User{Uid: 1}).First(user), false))
+			xtesting.Equal(t, user.Uid, 1)
+			xtesting.Equal(t, user.Name, "user1")
+			xtesting.Equal(t, user.DeletedAt.Format("2006-01-02 15:04:05"), DefaultDeletedAtTimestamp)
 
-	db.Model(&TblTest{}).Create(&TblTest{Id: 2, Name: "User2"})
+			// update
+			xtesting.Nil(t, check(db.Model(&User{Uid: 1}).Updates(&User{Name: "user1_new"}), true))
+			user = &User{}
+			xtesting.Nil(t, check(db.Model(&User{}).Where(&User{Uid: 1}).First(user), false))
+			xtesting.Equal(t, user.Uid, 1)
+			xtesting.Equal(t, user.Name, "user1_new")
 
-	test = &TblTest{}
-	db.Model(&TblTest{}).First(test)
-	log.Println(test)
+			// soft delete
+			xtesting.Nil(t, check(db.Model(&User{}).Delete(&User{Uid: 1}), true))
+			user = &User{}
+			xtesting.NotNil(t, check(db.Model(&User{}).Where(&User{Uid: 1}).First(user), false))
+			xtesting.Nil(t, check(db.Unscoped().Model(&User{}).Where(&User{Uid: 1}).First(user), false))
+			xtesting.NotEqual(t, user.DeletedAt.Format("2006-01-02 15:04:05"), DefaultDeletedAtTimestamp)
 
-	tests = make([]*TblTest, 0)
-	db.Model(&TblTest{}).Find(&tests)
-	log.Println(tests)
-
-	// db.Model(test).Related(test)
-	// log.Println(tests)
+			// hard delete
+			xtesting.Nil(t, check(db.Unscoped().Model(&User{}).Delete(&User{Uid: 1}), true))
+			xtesting.NotNil(t, check(db.Unscoped().Model(&User{}).Where(&User{Uid: 1}).First(&User{}), false))
+		})
+	}
 }
 
-/*
+func TestHelper(t *testing.T) {
+	l := logrus.New()
+	l.SetFormatter(&logrus.TextFormatter{ForceColors: true, FullTimestamp: true, TimestampFormat: time.RFC3339})
+
+	for _, tc := range []struct {
+		giveDialect string
+		giveParam   string
+	}{
+		{"mysql", mysqlDsl},
+		{"sqlite3", sqliteFile},
+	} {
+		t.Run(tc.giveDialect, func(t *testing.T) {
+			db, err := gorm.Open(tc.giveDialect, tc.giveParam)
+			if err != nil {
+				log.Println(err)
+				t.FailNow()
+			}
+			db.LogMode(true)
+			db.SetLogger(NewLogrusLogger(l))
+			HookDeletedAt(db, DefaultDeletedAtTimestamp)
+			db.DropTableIfExists(&User{})
+			if db.AutoMigrate(&User{}).Error != nil {
+				log.Println(err)
+				t.FailNow()
+			}
+
+			// create
+			sts, err := CreateErr(db.Model(&User{}).Create(&User{Uid: 1, Name: "user1"}))
+			xtesting.Equal(t, sts, xstatus.DbSuccess)
+			xtesting.Nil(t, err)
+			sts, err = CreateErr(db.Model(&User{}).Create(&User{Uid: 2, Name: "user1"})) // existed
+			xtesting.Equal(t, sts, xstatus.DbExisted)
+			xtesting.NotEqual(t, err, nil)
+			sts, err = CreateErr(db.Model(&User{}).Create(&User{Uid: 2, Name: "user2"}))
+			xtesting.Equal(t, sts, xstatus.DbSuccess)
+			xtesting.Nil(t, err)
+
+			// query
+			sts, err = QueryErr(db.Model(&User{}).Where(&User{Uid: 1}).First(&User{}))
+			xtesting.Equal(t, sts, xstatus.DbSuccess)
+			xtesting.Nil(t, err)
+			sts, err = QueryErr(db.Model(&User{}).Where(&User{Uid: 2, Name: "user1"}).First(&User{})) // not found
+			xtesting.Equal(t, sts, xstatus.DbNotFound)
+			xtesting.Nil(t, err)
+			sts, err = QueryErr(db.Model(&User{}).Where(&User{Uid: 3}).First(&User{})) // not found
+			xtesting.Equal(t, sts, xstatus.DbNotFound)
+			xtesting.Nil(t, err)
+
+			// update
+			sts, err = UpdateErr(db.Model(&User{}).Where(&User{Uid: 1}).Updates(&User{Name: "user1_new"}))
+			xtesting.Equal(t, sts, xstatus.DbSuccess)
+			xtesting.Nil(t, err)
+			sts, err = UpdateErr(db.Model(&User{}).Where(&User{Uid: 3}).Updates(&User{Name: "user3"})) // not found
+			xtesting.Equal(t, sts, xstatus.DbNotFound)
+			xtesting.Nil(t, err)
+			sts, err = UpdateErr(db.Model(&User{}).Where(&User{Uid: 2}).Updates(&User{Name: "user1_new"})) // existed
+			xtesting.Equal(t, sts, xstatus.DbExisted)
+			xtesting.NotNil(t, err)
+
+			// delete
+			sts, err = DeleteErr(db.Model(&User{}).Delete(&User{Uid: 1}))
+			xtesting.Equal(t, sts, xstatus.DbSuccess)
+			xtesting.Nil(t, err)
+			sts, err = DeleteErr(db.Model(&User{}).Delete(&User{Uid: 2}))
+			xtesting.Equal(t, sts, xstatus.DbSuccess)
+			xtesting.Nil(t, err)
+			sts, err = DeleteErr(db.Model(&User{}).Delete(&User{Uid: 3})) // not found
+			xtesting.Equal(t, sts, xstatus.DbNotFound)
+			xtesting.Nil(t, err)
+
+			// order
+			dict := PropertyDict{
+				"uid":      NewPropertyValue(false, "uid"),
+				"username": NewPropertyValue(false, "firstname", "lastname"),
+				"age":      NewPropertyValue(true, "birthday"),
+			}
+			for _, tc := range []struct {
+				giveSource string
+				giveDict   PropertyDict
+				want       string
+			}{
+				{"uid, xxx", dict, "uid ASC"},
+				{"uid desc xxx", dict, "uid DESC"},
+				{"uid, username", dict, "uid ASC, firstname ASC, lastname ASC"},
+				{"username desc, age desc", dict, "firstname DESC, lastname DESC, birthday ASC"},
+			} {
+				xtesting.Equal(t, GenerateOrderByExp(tc.giveSource, tc.giveDict), tc.want)
+			}
+		})
+	}
+}
+
 func TestLogger(t *testing.T) {
-	db, err := gorm.Open("mysql", "root:123@tcp(localhost:3306)/db_test?charset=utf8&parseTime=True&loc=Local")
-	if err != nil {
-		log.Fatalln(err)
+	l1 := logrus.New()
+	l1.SetFormatter(&logrus.TextFormatter{ForceColors: true, FullTimestamp: true, TimestampFormat: time.RFC3339})
+	l2 := log.New(os.Stderr, "", log.LstdFlags)
+
+	for _, tc := range []struct {
+		name   string
+		mode   bool
+		logger ILogger
+	}{
+		{"false mode", false, nil},
+		{"default logger", true, nil},
+		{"silence", true, NewSilenceLogger()},
+		{"logrus", true, NewLogrusLogger(l1)},
+		{"logger", true, NewLoggerLogger(l2)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			db, err := gorm.Open("mysql", mysqlDsl)
+			if err != nil {
+				log.Println(err)
+				t.FailNow()
+			}
+			db.LogMode(tc.mode)
+			if tc.logger != nil {
+				db.SetLogger(tc.logger)
+			}
+			HookDeletedAt(db, DefaultDeletedAtTimestamp) // log [info]
+			db.DropTableIfExists(&User{})
+			if db.AutoMigrate(&User{}).Error != nil {
+				log.Println(err)
+				t.FailNow()
+			}
+
+			db.Create(&User{Uid: 1, Name: "user1"})
+			db.Create(&User{Uid: 1, Name: "user1"}) // log [log]
+			db.Model(&User{}).Where(&User{Uid: 1}).First(&User{})
+			db.Model(&User{}).Where("name = ? OR name = ?", []byte("user1"), []byte{0x00, 0x01}).First(&User{}) // ?
+			db.Model(&User{}).Where("deleted_at = $1 OR deleted_at = $2", time.Time{}, nil).First(&User{})      // $
+		})
 	}
-
-	db.SingularTable(true)
-	db.LogMode(true)
-
-	db.SetLogger(NewSilenceLogger())
-	db.SetLogger(NewStdLogLogger(log.New(os.Stderr, "", log.LstdFlags)))
-	HookDeletedAt(db, DefaultDeletedAtTimestamp)
-
-	test := &TblTest{}
-	db.Model(&TblTest{}).First(test)
-	log.Println(test)
-	tests := make([]*TblTest, 0)
-	db.Model(&TblTest{}).Find(&tests)
-	log.Println(tests)
 }
-
-func TestOthers(t *testing.T) {
-	db, err := gorm.Open("mysql", "root:123@tcp(localhost:3306)/db_test?charset=utf8&parseTime=True&loc=Local")
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	db.SingularTable(true)
-	db.LogMode(false)
-
-	db.AutoMigrate(&TblTestUnique{})
-
-	rdb := db.Create(&TblTestUnique{Id: 1, Name: "1"})
-	log.Println(rdb.Error)
-	rdb = db.Create(&TblTestUnique{Id: 2, Name: "2"})
-	log.Println(rdb.Error)
-	rdb = db.Create(&TblTestUnique{Id: 3, Name: "1"})
-	log.Println(rdb.Error)
-	log.Println(IsMySQLDuplicateEntryError(rdb.Error))
-
-	// tt := &TblTestUnique{}
-	// rdb = db.Where("id = ?", 1).First(tt)
-	// log.Println(QueryErr(rdb))
-	// rdb = db.Where("id = ?", 3).First(tt)
-	// log.Println(QueryErr(rdb))
-}
-
-*/
-
-// func TestOrderBy(t *testing.T) {
-// 	dict := map[string]*xproperty.PropertyMapperValue{
-// 		"uid":      xproperty.NewValue(false, "uid"),
-// 		"username": xproperty.NewValue(false, "lastName", "firstName"),
-// 		"age":      xproperty.NewValue(true, "birthday"),
-// 	}
-//
-// 	xtesting.Equal(t, OrderByFunc(dict)("uid desc,age,username"), "uid DESC, birthday DESC, lastName ASC, firstName ASC")
-// 	xtesting.Equal(t, OrderByFunc(dict)(""), "")
-// 	xtesting.Equal(t, OrderByFunc(dict)("a"), "")
-// 	xtesting.Equal(t, OrderByFunc(map[string]*xproperty.PropertyMapperValue{})("a"), "")
-// }

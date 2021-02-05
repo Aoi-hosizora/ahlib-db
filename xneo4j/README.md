@@ -28,6 +28,7 @@
 
 ### Functions
 
++ `func Collect(result neo4j.Result, err error) ([]neo4j.Record, neo4j.ResultSummary, error)`
 + `func GetByColumnIndex(records []neo4j.Record, row int, index int) (interface{}, bool)`
 + `func GetByColumnKey(records []neo4j.Record, row int, key string) (interface{}, bool)`
 + `func GetInteger(data interface{}) int64`

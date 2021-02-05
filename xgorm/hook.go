@@ -8,6 +8,9 @@ import (
 )
 
 const (
+	// deletedAtFieldName represents the struct field name of "DeletedAt".
+	deletedAtFieldName = "DeletedAt"
+
 	// DefaultDeletedAtTimestamp represents the default value of GormTime.DeletedAt.
 	DefaultDeletedAtTimestamp = "1970-01-01 00:00:01"
 )
@@ -53,11 +56,11 @@ func HookDeletedAt(db *gorm.DB, deletedAtTimestamp string) {
 func deletedAtQueryUpdateCallback(deletedAtTimestamp string) func(scope *gorm.Scope) {
 	return func(scope *gorm.Scope) {
 		var (
-			quotedTableName                   = scope.QuotedTableName()
-			deletedAtField, hasDeletedAtField = scope.FieldByName("DeletedAt")
+			quotedTableName     = scope.QuotedTableName()
+			deletedAtField, has = scope.FieldByName(deletedAtFieldName)
 		)
 
-		if !scope.HasError() && !scope.Search.Unscoped && hasDeletedAtField {
+		if !scope.HasError() && !scope.Search.Unscoped && has {
 			scope.Search.Unscoped = true
 			sql := fmt.Sprintf("%s.%s = '%s'", quotedTableName, scope.Quote(deletedAtField.DBName), deletedAtTimestamp)
 			scope.Search.Where(sql)
@@ -78,43 +81,42 @@ func addExtraSpaceIfNotBlank(s string) string {
 // Reference: https://github.com/jinzhu/gorm/blob/master/callback_delete.go.
 func deletedAtDeleteCallback(deletedAtTimestamp string) func(scope *gorm.Scope) {
 	return func(scope *gorm.Scope) {
-		if scope.HasError() {
-			return
-		}
 		var extraOption string
 		if str, ok := scope.Get("gorm:delete_option"); ok {
 			extraOption = fmt.Sprint(str)
 		}
 		var (
-			quotedTableName                   = scope.QuotedTableName()
-			deletedAtField, hasDeletedAtField = scope.FieldByName("DeletedAt")
+			quotedTableName     = scope.QuotedTableName()
+			deletedAtField, has = scope.FieldByName(deletedAtFieldName)
 		)
 
-		if !scope.Search.Unscoped && hasDeletedAtField {
-			// replace `deleted_at IS NULL` to `deleted_at = 'xxx'`
-			var (
-				quotedFieldName = scope.Quote(deletedAtField.DBName)
-				isNullCond      = fmt.Sprintf("%s IS NULL", quotedFieldName)
-				equalCond       = fmt.Sprintf("%s = '%s'", quotedFieldName, deletedAtTimestamp)
-				combCond        = strings.ReplaceAll(scope.CombinedConditionSql(), isNullCond, equalCond)
-			)
-			sql := fmt.Sprintf(
-				"UPDATE %v SET %v='%v'%v%v",
-				quotedTableName,
-				quotedFieldName,
-				time.Now().Format("2006-01-02 15:04:05"), // scope.db.nowFunc()
-				addExtraSpaceIfNotBlank(combCond),
-				addExtraSpaceIfNotBlank(extraOption),
-			)
-			scope.Raw(sql).Exec()
-		} else {
-			sql := fmt.Sprintf(
-				"DELETE FROM %v%v%v",
-				scope.QuotedTableName(),
-				addExtraSpaceIfNotBlank(scope.CombinedConditionSql()),
-				addExtraSpaceIfNotBlank(extraOption),
-			)
-			scope.Raw(sql).Exec()
+		if !scope.HasError() {
+			if !scope.Search.Unscoped && has {
+				// replace `deleted_at IS NULL` to `deleted_at = 'xxx'`
+				var (
+					quotedFieldName = scope.Quote(deletedAtField.DBName)
+					isNullCond      = fmt.Sprintf("%s IS NULL", quotedFieldName)
+					equalCond       = fmt.Sprintf("%s = '%s'", quotedFieldName, deletedAtTimestamp)
+					combCond        = strings.ReplaceAll(scope.CombinedConditionSql(), isNullCond, equalCond)
+				)
+				sql := fmt.Sprintf(
+					"UPDATE %v SET %v='%v'%v%v",
+					quotedTableName,
+					quotedFieldName,
+					time.Now().Format("2006-01-02 15:04:05"),
+					addExtraSpaceIfNotBlank(combCond),
+					addExtraSpaceIfNotBlank(extraOption),
+				)
+				scope.Raw(sql).Exec()
+			} else {
+				sql := fmt.Sprintf(
+					"DELETE FROM %v%v%v",
+					scope.QuotedTableName(),
+					addExtraSpaceIfNotBlank(scope.CombinedConditionSql()),
+					addExtraSpaceIfNotBlank(extraOption),
+				)
+				scope.Raw(sql).Exec()
+			}
 		}
 	}
 }

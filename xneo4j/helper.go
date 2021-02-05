@@ -1,29 +1,43 @@
 package xneo4j
 
 import (
+	"github.com/Aoi-hosizora/ahlib-db/internal/orderby"
 	"github.com/neo4j/neo4j-go-driver/neo4j"
-	"strings"
 	"time"
 )
-
-// Cypher manual: https://neo4j.com/docs/cypher-manual/3.5/syntax/.
-// Neo4j go driver type: https://github.com/neo4j/neo4j-go-driver/tree/1.8.
-// Example of neo4j.Collect:
-// 	cypher := "MATCH p = ()-[r :FRIEND]->(n) RETURN r, n"
-// 	records, _ := neo4j.Collect(session.Run(cypher, nil)) // records is a slice of neo4j.Record
-// 	for _, record := range records {
-// 		// record is a slice of value (interface{}), can be get by Get(key string) or GetByIndex(index int)
-// 		rel := xneo4j.GetRel(record.Values()[0]) // neo4j.Relationship
-// 		relId, relTyp, relProps := rel.Id(), rel.Type(), rel.Props()
-// 		node := xneo4j.GetNode(record.Values()[1]) // neo4j.Node
-// 		nodeId, nodeLabels, nodeProps := node.Id(), node.Labels(), node.Props()
-// 	}
-var _ = neo4j.Collect
 
 // P represents the cypher parameter type, equals to "map[string]interface{}".
 // Example:
 // 	session.Run(`MATCH (n {id: $id}) RETURN n`, xneo4j.P{"id": 2})
 type P map[string]interface{}
+
+// Collect loops through the result stream, collects records into a slice and returns the resulting slice with result summary.
+//
+// Cypher manual refers to https://neo4j.com/docs/cypher-manual/3.5/syntax/.
+// Neo4j go driver refers to https://github.com/neo4j/neo4j-go-driver/tree/1.8.
+//
+// Example:
+// 	cypher := "MATCH p = ()-[r :FRIEND]->(n) RETURN r, n"
+// 	records, summary, err := xneo4j.Collect(session.Run(cypher, nil)) // err contains connect and execute error
+// 	for _, record := range records { // records is a slice of neo4j.Record
+// 		// record is the returned values, each value can be get by `Get` or `GetByIndex` methods
+// 		rel := xneo4j.GetRel(record.GetByIndex(0))   // neo4j.Relationship
+// 		node := xneo4j.GetNode(record.GetByIndex(1)) // neo4j.Node
+// 	}
+func Collect(result neo4j.Result, err error) ([]neo4j.Record, neo4j.ResultSummary, error) {
+	if err != nil {
+		return nil, nil, err // failed to connect
+	}
+	summary, err := result.Summary()
+	if err != nil {
+		return nil, nil, err // failed to execute
+	}
+	records, err := neo4j.Collect(result, err)
+	if err != nil {
+		return nil, nil, err // ...
+	}
+	return records, summary, nil
+}
 
 // GetByColumnIndex gets data from neo4j.Record-s by given row and column (return list) index, return false when index out of range.
 func GetByColumnIndex(records []neo4j.Record, row int, index int) (interface{}, bool) {
@@ -131,72 +145,18 @@ func GetDuration(data interface{}) neo4j.Duration {
 }
 
 // PropertyValue represents a PO entity's property mapping rule.
-type PropertyValue struct {
-	destinations []string // mapping destinations
-	reverse      bool     // reverse order mapping
-}
+type PropertyValue = orderby.PropertyValue
+
+// PropertyDict represents a DTO-PO PropertyValue dictionary, used in GenerateOrderByExp.
+type PropertyDict = orderby.PropertyDict
 
 // NewPropertyValue creates a PropertyValue by given reverse and destinations.
 func NewPropertyValue(reverse bool, destinations ...string) *PropertyValue {
-	finalDestinations := make([]string, 0, len(destinations))
-	for _, dest := range destinations {
-		dest = strings.TrimSpace(dest)
-		if dest != "" {
-			finalDestinations = append(finalDestinations, dest) // filter empty destination
-		}
-	}
-	return &PropertyValue{reverse: reverse, destinations: finalDestinations}
+	return orderby.NewPropertyValue(reverse, destinations...)
 }
 
-// Destinations returns the destinations of PropertyValue.
-func (p *PropertyValue) Destinations() []string {
-	return p.destinations
-}
-
-// Reverse returns the reverse of PropertyValue.
-func (p *PropertyValue) Reverse() bool {
-	return p.reverse
-}
-
-// PropertyDict represents a DTO-PO PropertyValue dictionary, used in GenerateOrderByExp.
-type PropertyDict map[string]*PropertyValue
-
-// GenerateOrderByExp returns a generated orderBy expresion by given source dto order string (split by ",") and PropertyDict.
+// GenerateOrderByExp returns a generated orderBy expresion by given source dto order string (split by ",", such as "name desc, age asc") and PropertyDict.
+// The generated expression is in mysql-sql and neo4j-cypher style, that is "xx ASC", "xx DESC".
 func GenerateOrderByExp(source string, dict PropertyDict) string {
-	source = strings.TrimSpace(source)
-	if source == "" {
-		return ""
-	}
-
-	result := make([]string, 0)
-	for _, src := range strings.Split(source, ",") {
-		src = strings.TrimSpace(src)
-		if src == "" {
-			continue
-		}
-		srcSp := strings.Split(src, " ") // xxx / yyy asc / zzz desc
-		if len(srcSp) > 2 {
-			continue
-		}
-
-		src = srcSp[0]
-		desc := len(srcSp) == 2 && strings.ToUpper(srcSp[1]) == "DESC"
-		value, ok := dict[src] // property mapping rule
-		if !ok || value == nil || len(value.destinations) == 0 {
-			continue
-		}
-
-		if value.reverse {
-			desc = !desc
-		}
-		for _, prop := range value.destinations {
-			direction := " ASC"
-			if !desc {
-				direction = " DESC"
-			}
-			result = append(result, prop+direction)
-		}
-	}
-
-	return strings.Join(result, ", ")
+	return orderby.GenerateOrderByExp(source, dict)
 }
