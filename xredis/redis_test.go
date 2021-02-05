@@ -5,6 +5,8 @@ import (
 	"github.com/Aoi-hosizora/ahlib/xtesting"
 	"github.com/go-redis/redis/v8"
 	"github.com/sirupsen/logrus"
+	"log"
+	"os"
 	"testing"
 	"time"
 )
@@ -112,5 +114,40 @@ func TestHelper(t *testing.T) {
 }
 
 func TestLogger(t *testing.T) {
+	l1 := logrus.New()
+	l1.SetFormatter(&logrus.TextFormatter{ForceColors: true, FullTimestamp: true, TimestampFormat: time.RFC3339})
+	l2 := log.New(os.Stderr, "", log.LstdFlags)
 
+	for _, tc := range []struct {
+		name   string
+		logger redis.Hook
+	}{
+		{"default", nil},
+		{"logrus", NewLogrusLogger(l1)},
+		{"logger", NewLoggerLogger(l2)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			client := redis.NewClient(&redis.Options{
+				Addr:     redisAddr,
+				Password: redisPasswd,
+				DB:       0,
+			})
+			redis.SetLogger(NewSilenceLogger())
+			if tc.logger != nil {
+				client.AddHook(tc.logger)
+			}
+
+			client.Get(context.Background(), "test")                   // String
+			client.HExists(context.Background(), "test", "xxx")        // Bool
+			client.Set(context.Background(), "test", "test", 0)        // Status
+			client.Set(context.Background(), "test1", "test 1", 0)     // Status
+			client.Set(context.Background(), "test2", "test 2", 0)     // Status
+			client.Get(context.Background(), "test")                   // String
+			client.Keys(context.Background(), "tes*")                  // StringSlice
+			client.Scan(context.Background(), 0, "test", 10)           // Scan
+			client.Del(context.Background(), "test", "test1", "test2") // Int
+			client.Set(context.Background(), "F", 1.1, 0)              // Status
+			client.IncrByFloat(context.Background(), "F", 1)           // Float
+		})
+	}
 }

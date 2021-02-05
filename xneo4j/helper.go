@@ -39,26 +39,6 @@ func Collect(result neo4j.Result, err error) ([]neo4j.Record, neo4j.ResultSummar
 	return records, summary, nil
 }
 
-// GetByColumnIndex gets data from neo4j.Record-s by given row and column (return list) index, return false when index out of range.
-func GetByColumnIndex(records []neo4j.Record, row int, index int) (interface{}, bool) {
-	if row >= len(records) {
-		return nil, false
-	}
-	rec := records[row]
-	if index >= len(rec.Keys()) {
-		return nil, false
-	}
-	return rec.GetByIndex(index), true
-}
-
-// GetByColumnKey gets data from neo4j.Record-s by given row and column (return list) key, return false when index out of range or key is not found.
-func GetByColumnKey(records []neo4j.Record, row int, key string) (interface{}, bool) {
-	if row >= len(records) {
-		return nil, false
-	}
-	return records[row].Get(key)
-}
-
 // GetInteger returns neo4j Integer value (int64) from given data.
 func GetInteger(data interface{}) int64 {
 	return data.(int64)
@@ -110,8 +90,11 @@ func GetPath(data interface{}) neo4j.Path {
 }
 
 // GetPoint returns neo4j Point value (neo4j.Point) from given data.
-func GetPoint(data interface{}) neo4j.Point {
-	return data.(neo4j.Point)
+func GetPoint(data interface{}) *neo4j.Point {
+	if p, ok := data.(neo4j.Point); ok {
+		return &p
+	}
+	return data.(*neo4j.Point)
 }
 
 // GetDate returns neo4j Date value (neo4j.Date) from given data.

@@ -198,8 +198,8 @@ func TestLogger(t *testing.T) {
 		mode   bool
 		logger ILogger
 	}{
-		{"false mode", false, nil},
-		{"default logger", true, nil},
+		{"disable mode", false, nil},
+		{"default", true, nil},
 		{"silence", true, NewSilenceLogger()},
 		{"logrus", true, NewLogrusLogger(l1)},
 		{"logger", true, NewLoggerLogger(l2)},

@@ -41,11 +41,11 @@ func SetAll(client *redis.Client, keys, values []string) (tot, add int, err erro
 	var someErr error
 	for idx, key := range keys {
 		val := values[idx]
-		err := client.Set(context.Background(), key, val, 0).Err()
-		if err == nil {
+		e := client.Set(context.Background(), key, val, 0).Err()
+		if e == nil {
 			add++
 		} else if someErr == nil {
-			someErr = err
+			someErr = e
 		}
 	}
 

@@ -6,6 +6,7 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/sirupsen/logrus"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -43,6 +44,7 @@ var _ redis.Hook = &LogrusLogger{}
 // NewLogrusLogger creates a new LogrusLogger using given logrus.Logger.
 // Example:
 // 	client := redis.NewClient(options)
+// 	redis.SetLogger(NewSilenceLogger())
 // 	l := logrus.New()
 // 	l.SetFormatter(&logrus.TextFormatter{})
 // 	client.AddHook(xredis.NewLogrusLogger(l))
@@ -60,6 +62,7 @@ var _ redis.Hook = &LoggerLogger{}
 // NewLoggerLogger creates a new LoggerLogger using given logrus.StdLogger.
 // Example:
 // 	client := redis.NewClient(options)
+// 	redis.SetLogger(NewSilenceLogger())
 // 	l := log.New(os.Stderr, "", log.LstdFlags)
 // 	client.AddHook(xredis.NewLoggerLogger(l))
 func NewLoggerLogger(logger logrus.StdLogger) *LoggerLogger {
@@ -131,7 +134,10 @@ func (l *LoggerLogger) AfterProcess(ctx context.Context, cmd redis.Cmder) error 
 // formatLoggerAndFields formats redis.Cmder and time.Duration to logger string, logrus.Fields and isError flag.
 // Logs like:
 // 	[Redis] dial tcp 127.0.0.1:6378: connectex: No connection could be made because the target machine actively refused it. | F:/Projects/ahlib-db/xredis/redis_test.go:59
-// 	[Redis]      1 |    25.9306ms | set 'test num' 1 | F:/Projects/ahlib-db/xredis/redis_test.go:59
+// 	[Redis]      3 |      995.5µs | keys tes* | F:/Projects/ahlib-db/xredis/redis_test.go:146
+// 	[Redis]     2i |      997.8µs | del test_ test_c | F:/Projects/ahlib-db/xredis/helper.go:21
+// 	[Redis]      F |      997.3µs | hexists test xxx | F:/Projects/ahlib-db/xredis/redis_test.go:141
+// 	[Redis]     OK |    25.9306ms | set 'test num' 1 | F:/Projects/ahlib-db/xredis/redis_test.go:59
 // 	       |------| |------------| |----------------| |--------------------------------------------|
 // 	          6           12               ...                               ...
 func formatLoggerAndFields(cmd redis.Cmder, duration time.Duration, source string) (string, logrus.Fields, bool) {
@@ -152,6 +158,10 @@ func formatLoggerAndFields(cmd redis.Cmder, duration time.Duration, source strin
 		// result
 		command := render(cmd.Args())
 		rows, status := parseCmd(cmd)
+		first := status // first field
+		if first == "" {
+			first = strconv.Itoa(rows)
+		}
 
 		fields = logrus.Fields{
 			"module":   "redis",
@@ -161,7 +171,7 @@ func formatLoggerAndFields(cmd redis.Cmder, duration time.Duration, source strin
 			"duration": duration,
 			"source":   source,
 		}
-		msg = fmt.Sprintf("[Redis] %6d | %12s | %s | %s", rows, duration.String(), command, source)
+		msg = fmt.Sprintf("[Redis] %6s | %12s | %s | %s", first, duration.String(), command, source)
 	}
 
 	return msg, fields, isErr
@@ -233,14 +243,25 @@ func parseCmd(cmd redis.Cmder) (rows int, status string) {
 	case *redis.CommandsInfoCmd:
 		rows = len(cmd.Val())
 
-	// others
+	// value
 	case *redis.StatusCmd:
 		rows = 1
 		status = cmd.Val()
-	case *redis.BoolCmd, *redis.FloatCmd, *redis.IntCmd, *redis.StringCmd, *redis.DurationCmd, *redis.TimeCmd,
-		*redis.Cmd, *redis.XInfoStreamCmd, *redis.ZWithKeyCmd:
+	case *redis.BoolCmd:
 		rows = 1
-	default:
+		status = "T"
+		if !cmd.Val() {
+			status = "F"
+		}
+	case *redis.IntCmd:
+		rows = 1
+		status = fmt.Sprintf("%di", cmd.Val())
+	case *redis.FloatCmd:
+		rows = 1
+		status = fmt.Sprintf("%.1ff", cmd.Val())
+
+	// other
+	case *redis.StringCmd, *redis.DurationCmd, *redis.TimeCmd, *redis.Cmd, *redis.XInfoStreamCmd, *redis.ZWithKeyCmd:
 		rows = 1
 	}
 	return rows, status

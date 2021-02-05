@@ -42,6 +42,7 @@ const (
 // 	pool := xneo4j.NewPool(driver, func(driver neo4j.Driver, accessMode neo4j.AccessMode, bookmarks ...string) (neo4j.Session, error) {
 // 		return driver.NewSession(neo4j.SessionConfig{
 // 			AccessMode:   accessMode,
+// 			Bookmarks:    bookmarks,
 // 			DatabaseName: database, // custom config
 // 		})
 // 	})

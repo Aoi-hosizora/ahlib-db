@@ -10,7 +10,6 @@ import (
 	"runtime"
 	"strings"
 	"time"
-	"unicode"
 )
 
 // loggerOptions represents some options for logger, set by LoggerOption.
@@ -36,7 +35,7 @@ func WithCounterField(switcher bool) LoggerOption {
 	}
 }
 
-// LogrusLogger represents a neo4j.Session, logs neo4j cypher executing message to logrus.Logger.
+// LogrusLogger represents a neo4j.Session, used to log neo4j cypher executing message to logrus.Logger.
 type LogrusLogger struct {
 	neo4j.Session
 	logger  *logrus.Logger
@@ -46,6 +45,12 @@ type LogrusLogger struct {
 var _ neo4j.Session = &LogrusLogger{}
 
 // NewLogrusLogger creates a new LogrusLogger using given logrus.Logger and LoggerOption-s.
+// Example:
+// 	driver, err := neo4j.NewDriver(target, auth)
+// 	session, err := driver.Session(neo4j.AccessModeRead)
+// 	l := logrus.New()
+// 	l.SetFormatter(&logrus.TextFormatter{})
+// 	session = NewLogrusLogger(session, l) // with default skip 1
 func NewLogrusLogger(session neo4j.Session, logger *logrus.Logger, options ...LoggerOption) *LogrusLogger {
 	opt := &loggerOptions{
 		skip:         1,     // default to 1
@@ -59,7 +64,7 @@ func NewLogrusLogger(session neo4j.Session, logger *logrus.Logger, options ...Lo
 	return &LogrusLogger{Session: session, logger: logger, options: opt}
 }
 
-// LoggerLogger represents a neo4j.Session, logs neo4j cypher executing message to logrus.StdLogger.
+// LoggerLogger represents a neo4j.Session, used to log neo4j cypher executing message to logrus.StdLogger.
 type LoggerLogger struct {
 	neo4j.Session
 	logger  logrus.StdLogger
@@ -69,6 +74,11 @@ type LoggerLogger struct {
 var _ neo4j.Session = &LoggerLogger{}
 
 // NewLoggerLogger creates a new LoggerLogger using given log.Logger and LoggerOption-s.
+// Example:
+// 	driver, err := neo4j.NewDriver(target, auth)
+// 	session, err := driver.Session(neo4j.AccessModeRead)
+// 	l := log.New(os.Stderr, "", log.LstdFlags)
+// 	session = NewLoggerLogger(session, l) // with default skip 1
 func NewLoggerLogger(session neo4j.Session, logger logrus.StdLogger, options ...LoggerOption) *LoggerLogger {
 	opt := &loggerOptions{
 		skip:         1,     // default to 1
@@ -134,7 +144,9 @@ func formatLoggerAndFields(result neo4j.Result, err error, source string, option
 		}
 		msg = fmt.Sprintf("[Neo4j] %v | %s", err, source)
 	} else if summary, err := result.Summary(); err != nil { // failed to execute (Server error)
+		// Neo.ClientError.Security.Unauthorized
 		// Neo.ClientError.Statement.SyntaxError
+		// Neo.ClientError.Statement.TypeError
 		// Neo.ClientError.Schema.ConstraintValidationFailed
 		// ...
 		isErr = true
@@ -177,16 +189,6 @@ func formatLoggerAndFields(result neo4j.Result, err error, source string, option
 	}
 
 	return msg, fields, isErr
-}
-
-// isPrintable is a string util function used in render.
-func isPrintable(s string) bool {
-	for _, r := range s {
-		if !unicode.IsPrint(r) {
-			return false
-		}
-	}
-	return true
 }
 
 // render renders cypher string and parameters to complete cypher expression.
@@ -236,12 +238,6 @@ func render(cypher string, params map[string]interface{}) string {
 			}
 
 		// other types
-		case []byte:
-			if str := string(value); isPrintable(str) {
-				values[k] = fmt.Sprintf("'%v'", str)
-			} else {
-				values[k] = "'<binary>'"
-			}
 		case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64, bool:
 			values[k] = fmt.Sprintf("%v", value)
 		default:

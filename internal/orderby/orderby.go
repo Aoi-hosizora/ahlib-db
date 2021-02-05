@@ -58,7 +58,7 @@ func GenerateOrderByExp(source string, dict PropertyDict) string {
 
 		srcSp := strings.Split(src, " ") // xxx / yyy asc / zzz desc
 		src = srcSp[0]
-		desc := len(srcSp) == 2 && strings.ToUpper(srcSp[1]) == "DESC"
+		desc := len(srcSp) >= 2 && strings.ToUpper(srcSp[1]) == "DESC"
 		value, ok := dict[src] // property mapping rule
 		if !ok || value == nil || len(value.destinations) == 0 {
 			continue

@@ -1,10 +1,12 @@
 # ahlib-db
 
+[![Build Status](https://travis-ci.com/Aoi-hosizora/ahlib-db.svg?branch=master)](https://travis-ci.com/Aoi-hosizora/ahlib-db)
+[![codecov](https://codecov.io/gh/Aoi-hosizora/ahlib-db/branch/master/graph/badge.svg)](https://codecov.io/gh/Aoi-hosizora/ahlib-db)
 [![Go Report Card](https://goreportcard.com/badge/github.com/Aoi-hosizora/ahlib-db)](https://goreportcard.com/report/github.com/Aoi-hosizora/ahlib-db)
 [![License](http://img.shields.io/badge/license-mit-blue.svg)](./LICENSE)
 [![Release](https://img.shields.io/github/v/release/Aoi-hosizora/ahlib-db)](https://github.com/Aoi-hosizora/ahlib-db/releases)
 
-+ A personal golang library for db development, including gorm (mysql), redis, neo4j.
++ A personal golang library for db development, including gorm (mysql, sqlite, postgresql), redis (go-redis), neo4j (neo4j-go-driver).
 
 ### Related libraries
 
@@ -15,9 +17,9 @@
 
 ### Packages
 
-+ xgorm (waiting for refactor)
-+ xneo4j (waiting for refactor)
-+ xredis (waiting for refactor)
++ xgorm
++ xneo4j
++ xredis
 
 ### Dependencies
 
