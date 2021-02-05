@@ -1,234 +1,145 @@
 package xneo4j
 
 import (
-	"fmt"
-	"github.com/Aoi-hosizora/ahlib/xproperty"
-	"github.com/Aoi-hosizora/ahlib/xtime"
+	"github.com/Aoi-hosizora/ahlib-db/internal/orderby"
 	"github.com/neo4j/neo4j-go-driver/neo4j"
-	"strings"
 	"time"
 )
 
-// Get records from run result, see neo4j.Collect.
+// P represents the cypher parameter type, equals to "map[string]interface{}".
+// Example:
+// 	session.Run(`MATCH (n {id: $id}) RETURN n`, xneo4j.P{"id": 2})
+type P map[string]interface{}
+
+// Collect loops through the result stream, collects records into a slice and returns the resulting slice with result summary.
 //
-// 1. result: array of neo4j.Record;
-//
-// 2. record: array of columns value -> Get(key) / GetByIndex(index);
+// Cypher manual refers to https://neo4j.com/docs/cypher-manual/3.5/syntax/.
+// Neo4j go driver refers to https://github.com/neo4j/neo4j-go-driver/tree/1.8.
 //
 // Example:
-//	cypher := "MATCH p = ()-[r :FRIEND]->(n) RETURN r, n"
-//	rec, _ := xneo4j.GetRecords(session.Run(cypher, nil)) // slice of neo4j.Record
-//	for _, r := range rec { // slice of value (interface{})
-//		rel := xneo4j.GetRel(r.Values()[0]) // neo4j.Node
-//		node := xneo4j.GetNode(r.Values()[1]) // neo4j.Relationship
-//		log.Println(rel.Id(), rel.Type(), node.Id(), node.Props())
-//	}
-func GetRecords(result neo4j.Result, err error) ([]neo4j.Record, error) {
-	records, _, err := GetRecordsWithSummary(result, err)
-	return records, err
-}
-
-// Get neo4j.Record slice and neo4j.ResultSummary.
-func GetRecordsWithSummary(result neo4j.Result, err error) ([]neo4j.Record, neo4j.ResultSummary, error) {
+// 	cypher := "MATCH p = ()-[r :FRIEND]->(n) RETURN r, n"
+// 	records, summary, err := xneo4j.Collect(session.Run(cypher, nil)) // err contains connect and execute error
+// 	for _, record := range records { // records is a slice of neo4j.Record
+// 		// record is the returned values, each value can be get by `Get` or `GetByIndex` methods
+// 		rel := xneo4j.GetRel(record.GetByIndex(0))   // neo4j.Relationship
+// 		node := xneo4j.GetNode(record.GetByIndex(1)) // neo4j.Node
+// 	}
+func Collect(result neo4j.Result, err error) ([]neo4j.Record, neo4j.ResultSummary, error) {
 	if err != nil {
-		return nil, nil, err
-	} else if result == nil {
-		return nil, nil, fmt.Errorf("nil neo4j result")
+		return nil, nil, err // failed to connect
 	}
-
 	summary, err := result.Summary()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, err // failed to execute
 	}
-
-	rec := make([]neo4j.Record, 0)
-	for result.Next() {
-		rec = append(rec, result.Record())
+	records, err := neo4j.Collect(result, err)
+	if err != nil {
+		return nil, nil, err // ...
 	}
-	if err := result.Err(); err != nil {
-		return nil, nil, err
-	}
-
-	return rec, summary, nil
+	return records, summary, nil
 }
 
-func NowLocalDateTime() neo4j.LocalDateTime {
-	return neo4j.LocalDateTimeOf(xtime.ToDateTime(time.Now()))
-}
-
-func NowLocalTime() neo4j.LocalTime {
-	return neo4j.LocalTimeOf(xtime.ToDateTime(time.Now()))
-}
-
-func NowDate() neo4j.Date {
-	return neo4j.DateOf(xtime.ToDate(time.Now()))
-}
-
-func NowTime() neo4j.OffsetTime {
-	return neo4j.OffsetTimeOf(xtime.ToDateTime(time.Now()))
-}
-
-func GetData(records []neo4j.Record, column int, row int) interface{} {
-	return records[column].GetByIndex(row)
-}
-
+// GetInteger returns neo4j Integer value (int64) from given data.
 func GetInteger(data interface{}) int64 {
 	return data.(int64)
 }
 
+// GetFloat returns neo4j Float value (float64) from given data.
 func GetFloat(data interface{}) float64 {
 	return data.(float64)
 }
 
+// GetString returns neo4j String value (string) from given data.
 func GetString(data interface{}) string {
 	return data.(string)
 }
 
+// GetBoolean returns neo4j Boolean value (bool) from given data.
 func GetBoolean(data interface{}) bool {
 	return data.(bool)
 }
 
+// GetByteArray returns neo4j ByteArray value ([]byte) from given data.
 func GetByteArray(data interface{}) []byte {
 	return data.([]byte)
 }
 
+// GetList returns neo4j List value ([]interface{}) from given data.
 func GetList(data interface{}) []interface{} {
 	return data.([]interface{})
 }
 
+// GetMap returns neo4j Map value (map[string]interface{}) from given data.
 func GetMap(data interface{}) map[string]interface{} {
 	return data.(map[string]interface{})
 }
 
+// GetNode returns neo4j Node value (neo4j.Node) from given data.
 func GetNode(data interface{}) neo4j.Node {
 	return data.(neo4j.Node)
 }
 
+// GetRel returns neo4j Relationship value (neo4j.Relationship) from given data.
 func GetRel(data interface{}) neo4j.Relationship {
 	return data.(neo4j.Relationship)
 }
 
+// GetPath returns neo4j Path value (neo4j.Path) from given data.
 func GetPath(data interface{}) neo4j.Path {
 	return data.(neo4j.Path)
 }
 
-func GetPoint(data interface{}) neo4j.Point {
-	return data.(neo4j.Point)
+// GetPoint returns neo4j Point value (neo4j.Point) from given data.
+func GetPoint(data interface{}) *neo4j.Point {
+	if p, ok := data.(neo4j.Point); ok {
+		return &p
+	}
+	return data.(*neo4j.Point)
 }
 
+// GetDate returns neo4j Date value (neo4j.Date) from given data.
 func GetDate(data interface{}) neo4j.Date {
 	return data.(neo4j.Date)
 }
 
+// GetTime returns neo4j Time value (neo4j.OffsetTime) from given data.
 func GetTime(data interface{}) neo4j.OffsetTime {
 	return data.(neo4j.OffsetTime)
 }
 
-func GetLocalTime(data interface{}) neo4j.LocalTime {
-	return data.(neo4j.LocalTime)
-}
-
+// GetDateTime returns neo4j DateTime value (time.Time) from given data.
 func GetDateTime(data interface{}) time.Time {
 	return data.(time.Time)
 }
 
+// GetLocalTime returns neo4j LocalTime value (neo4j.LocalTime) from given data.
+func GetLocalTime(data interface{}) neo4j.LocalTime {
+	return data.(neo4j.LocalTime)
+}
+
+// GetLocalDateTime returns neo4j LocalDateTime value (neo4j.LocalDateTime) from given data.
 func GetLocalDateTime(data interface{}) neo4j.LocalDateTime {
 	return data.(neo4j.LocalDateTime)
 }
 
+// GetDuration returns neo4j Duration value (neo4j.Duration) from given data.
 func GetDuration(data interface{}) neo4j.Duration {
 	return data.(neo4j.Duration)
 }
 
-func OrderByFunc(p xproperty.PropertyDict) func(source, parent string) string {
-	return func(source, parent string) string {
-		result := make([]string, 0)
-		if source == "" {
-			return ""
-		}
+// PropertyValue represents a PO entity's property mapping rule.
+type PropertyValue = orderby.PropertyValue
 
-		sources := strings.Split(source, ",")
-		for _, src := range sources {
-			if src == "" {
-				continue
-			}
+// PropertyDict represents a DTO-PO PropertyValue dictionary, used in GenerateOrderByExp.
+type PropertyDict = orderby.PropertyDict
 
-			src = strings.TrimSpace(src)
-			reverse := strings.HasSuffix(src, " desc") || strings.HasSuffix(src, " DESC")
-			src = strings.Split(src, " ")[0]
-
-			dest, ok := p[src]
-			if !ok || dest == nil || len(dest.Destinations) == 0 {
-				continue
-			}
-
-			if dest.Revert {
-				reverse = !reverse
-			}
-			for _, prop := range dest.Destinations {
-				prop = parent + "." + prop
-				if !reverse {
-					prop += " ASC"
-				} else {
-					prop += " DESC"
-				}
-				result = append(result, prop)
-			}
-		}
-
-		return strings.Join(result, ", ")
-	}
+// NewPropertyValue creates a PropertyValue by given reverse and destinations.
+func NewPropertyValue(reverse bool, destinations ...string) *PropertyValue {
+	return orderby.NewPropertyValue(reverse, destinations...)
 }
 
-func OrderByFunc2(p xproperty.PropertyDict, v xproperty.VariableDict) func(source string, parents ...string) string {
-	return func(source string, parents ...string) string {
-		result := make([]string, 0)
-		if source == "" {
-			return ""
-		}
-
-		sources := strings.Split(source, ",")
-		for _, src := range sources {
-			if src == "" {
-				continue
-			}
-
-			src = strings.TrimSpace(src)
-			reverse := strings.HasSuffix(src, " desc") || strings.HasSuffix(src, " DESC")
-			src = strings.Split(src, " ")[0]
-
-			dest, ok := p[src]
-			if !ok || dest == nil || len(dest.Destinations) == 0 {
-				continue
-			}
-			if len(v) == 0 {
-				return ""
-			}
-
-			if dest.Revert {
-				reverse = !reverse
-			}
-			for _, prop := range dest.Destinations {
-				idx, ok := v[prop]
-				if ok {
-					idx-- // 1 -> 0
-				} else {
-					idx = 0
-				}
-				if len(parents) < idx {
-					idx = 0
-				}
-
-				prop = parents[idx] + "." + prop
-				if !reverse {
-					prop += " ASC"
-				} else {
-					prop += " DESC"
-				}
-				result = append(result, prop)
-			}
-		}
-
-		return strings.Join(result, ", ")
-	}
+// GenerateOrderByExp returns a generated orderBy expresion by given source dto order string (split by ",", such as "name desc, age asc") and PropertyDict.
+// The generated expression is in mysql-sql and neo4j-cypher style, that is "xx ASC", "xx DESC".
+func GenerateOrderByExp(source string, dict PropertyDict) string {
+	return orderby.GenerateOrderByExp(source, dict)
 }

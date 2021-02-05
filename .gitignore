@@ -8,3 +8,6 @@
 logs/
 build/
 coverage.txt
+*.log
+*.sql
+*.sql-journal

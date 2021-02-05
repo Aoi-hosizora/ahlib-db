@@ -1,66 +1,153 @@
 package xredis
 
 import (
-	"github.com/gomodule/redigo/redis"
+	"context"
+	"github.com/Aoi-hosizora/ahlib/xtesting"
+	"github.com/go-redis/redis/v8"
 	"github.com/sirupsen/logrus"
 	"log"
 	"os"
-	"sync"
 	"testing"
+	"time"
 )
 
-func TestLogrus(t *testing.T) {
-	conn, err := redis.Dial("tcp", "localhost:6379", redis.DialPassword("123"), redis.DialDatabase(1))
-	if err != nil {
-		log.Fatalln(err)
-	}
+const (
+	redisAddr   = "localhost:6379"
+	redisPasswd = "123"
+	redisDB     = 0
+)
 
-	conn = NewLogrusRedis(conn, logrus.New(), true).WithSkip(3)
-	conn = NewMutexRedis(conn)
+func TestHelper(t *testing.T) {
+	client := redis.NewClient(&redis.Options{
+		Addr:     redisAddr,
+		Password: redisPasswd,
+		DB:       redisDB,
+	})
+	l := logrus.New()
+	l.SetFormatter(&logrus.TextFormatter{ForceColors: true, FullTimestamp: true, TimestampFormat: time.RFC3339})
+	redis.SetLogger(NewSilenceLogger())
+	client.AddHook(NewLogrusLogger(l))
 
-	_, _ = conn.Do("GET", "aaaaa-a")
-	_, _ = conn.Do("SET", "aaaaa-a", "abc")
-	_, _ = conn.Do("SET", "aaaaa-b", "bcd")
-	_, _ = conn.Do("GET", "aaaaa-a")
-	_, _ = conn.Do("KEYS", "aaaaa-*")
-	_, _, _ = WithConn(conn).DeleteAll("aaaaa-*")
+	t.Run("DeleteAll", func(t *testing.T) {
+		client.Set(context.Background(), "test_a", "test_aaa", 0)
+		client.Set(context.Background(), "test_b", "test_bbb", 0)
+		client.Set(context.Background(), "test_c", "test_ccc", 0)
+
+		tot, del, err := DelAll(client, "test_")
+		xtesting.Equal(t, tot, 0)
+		xtesting.Equal(t, del, 0)
+		xtesting.Nil(t, err)
+		tot, del, err = DelAll(client, "test_a")
+		xtesting.Equal(t, tot, 1)
+		xtesting.Equal(t, del, 1)
+		xtesting.Nil(t, err)
+		tot, del, err = DelAll(client, "test_*")
+		xtesting.Equal(t, tot, 2)
+		xtesting.Equal(t, del, 2)
+		xtesting.Nil(t, err)
+	})
+
+	t.Run("SetAll", func(t *testing.T) {
+		for _, tc := range []struct {
+			giveKeys   []string
+			giveValues []string
+			wantOk     bool
+		}{
+			{[]string{}, []string{}, true},
+			{[]string{"k"}, []string{}, false},
+			{[]string{}, []string{"v"}, false},
+			{[]string{"test_a", "test_b", "test_c"}, []string{"test_aaa", "test_bbb", "test_ccc"}, true},
+		} {
+			tot, add, err := SetAll(client, tc.giveKeys, tc.giveValues)
+			if !tc.wantOk {
+				xtesting.NotNil(t, err)
+			} else {
+				xtesting.Nil(t, err)
+				xtesting.Equal(t, tot, len(tc.giveKeys))
+				xtesting.Equal(t, add, len(tc.giveKeys))
+				for idx := range tc.giveKeys {
+					k, v := tc.giveKeys[idx], tc.giveValues[idx]
+					xtesting.Equal(t, client.Get(context.Background(), k).Val(), v)
+				}
+			}
+		}
+	})
+
+	t.Run("SetExAll", func(t *testing.T) {
+		for _, tc := range []struct {
+			giveKeys   []string
+			giveValues []string
+			giveExs    []int64
+			wantOk     bool
+		}{
+			{[]string{}, []string{}, []int64{}, true},
+			{[]string{"k"}, []string{}, []int64{0}, false},
+			{[]string{}, []string{"v"}, []int64{0}, false},
+			{[]string{"k"}, []string{"v"}, []int64{}, false},
+			{[]string{"test_a", "test_b", "test_c"}, []string{"test_aaa", "test_bbb", "test_ccc"}, []int64{1, 1, 1}, true},
+		} {
+			tot, add, err := SetExAll(client, tc.giveKeys, tc.giveValues, tc.giveExs)
+			if !tc.wantOk {
+				xtesting.NotNil(t, err)
+			} else {
+				xtesting.Nil(t, err)
+				xtesting.Equal(t, tot, len(tc.giveKeys))
+				xtesting.Equal(t, add, len(tc.giveKeys))
+				for idx := range tc.giveKeys {
+					k, v := tc.giveKeys[idx], tc.giveValues[idx]
+					xtesting.Equal(t, client.Get(context.Background(), k).Val(), v)
+				}
+
+				maxWait := int64(-1)
+				for _, s := range tc.giveExs {
+					if s > maxWait {
+						maxWait = s
+					}
+				}
+				time.Sleep(time.Second * time.Duration(maxWait+1))
+				for idx := range tc.giveKeys {
+					xtesting.NotNil(t, client.Get(context.Background(), tc.giveKeys[idx]).Err())
+				}
+			}
+		}
+	})
 }
 
 func TestLogger(t *testing.T) {
-	conn, err := redis.Dial("tcp", "localhost:6379", redis.DialPassword("123"), redis.DialDatabase(1))
-	if err != nil {
-		log.Fatalln(err)
+	l1 := logrus.New()
+	l1.SetFormatter(&logrus.TextFormatter{ForceColors: true, FullTimestamp: true, TimestampFormat: time.RFC3339})
+	l2 := log.New(os.Stderr, "", log.LstdFlags)
+
+	for _, tc := range []struct {
+		name   string
+		logger redis.Hook
+	}{
+		{"default", nil},
+		{"logrus", NewLogrusLogger(l1)},
+		{"logger", NewLoggerLogger(l2)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			client := redis.NewClient(&redis.Options{
+				Addr:     redisAddr,
+				Password: redisPasswd,
+				DB:       0,
+			})
+			redis.SetLogger(NewSilenceLogger())
+			if tc.logger != nil {
+				client.AddHook(tc.logger)
+			}
+
+			client.Get(context.Background(), "test")                   // String
+			client.HExists(context.Background(), "test", "xxx")        // Bool
+			client.Set(context.Background(), "test", "test", 0)        // Status
+			client.Set(context.Background(), "test1", "test 1", 0)     // Status
+			client.Set(context.Background(), "test2", "test 2", 0)     // Status
+			client.Get(context.Background(), "test")                   // String
+			client.Keys(context.Background(), "tes*")                  // StringSlice
+			client.Scan(context.Background(), 0, "test", 10)           // Scan
+			client.Del(context.Background(), "test", "test1", "test2") // Int
+			client.Set(context.Background(), "F", 1.1, 0)              // Status
+			client.IncrByFloat(context.Background(), "F", 1)           // Float
+		})
 	}
-
-	conn = NewLoggerRedis(conn, log.New(os.Stderr, "", log.LstdFlags), true).WithSkip(3)
-	conn = NewMutexRedis(conn)
-
-	_, _ = conn.Do("GET", "aaaaa-a")
-	_, _ = conn.Do("SET", "aaaaa-a", "abc")
-	_, _ = conn.Do("SET", "aaaaa-b", "bcd")
-	_, _ = conn.Do("GET", "aaaaa-a")
-	_, _ = conn.Do("KEYS", "aaaaa-*")
-	_, _, _ = WithConn(conn).DeleteAll("aaaaa-*")
-}
-
-func TestMutex(t *testing.T) {
-	conn, err := redis.Dial("tcp", "localhost:6379", redis.DialPassword("123"), redis.DialDatabase(1))
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	logger := logrus.New()
-	logger.SetFormatter(&logrus.TextFormatter{})
-	conn = NewLogrusRedis(conn, logger, true).WithSkip(3)
-	conn = NewMutexRedis(conn)
-
-	wg := sync.WaitGroup{}
-	wg.Add(10)
-	for i := 0; i < 10; i++ {
-		go func() {
-			_, _ = conn.Do("GET", "aaaaa-a")
-			wg.Done()
-		}()
-	}
-	wg.Wait()
 }

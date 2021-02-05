@@ -1,161 +1,121 @@
 package xgorm
 
 import (
-	"fmt"
-	"github.com/Aoi-hosizora/ahlib/xproperty"
+	"github.com/Aoi-hosizora/ahlib-db/internal/orderby"
 	"github.com/Aoi-hosizora/ahlib/xstatus"
 	"github.com/go-sql-driver/mysql"
 	"github.com/jinzhu/gorm"
-	"strings"
+	"github.com/lib/pq"
+	"github.com/mattn/go-sqlite3"
 )
 
-// Helper is an extension of gorm.DB.
-type Helper struct {
-	db *gorm.DB
-}
-
-// WithDB creates a Helper with gorm.DB.
-func WithDB(db *gorm.DB) *Helper {
-	return &Helper{db: db}
-}
-
-// GetDB gets the original gorm.DB.
-func (h *Helper) GetDB() *gorm.DB {
-	return h.db
-}
-
-// Pagination: db.Limit(limit).Offset((page - 1) * limit)
-func (h *Helper) Pagination(limit int32, page int32) *gorm.DB {
-	return h.db.Limit(limit).Offset((page - 1) * limit)
-}
-
-// Count: db.Model(model).Where(where).Count(&cnt)
-func (h *Helper) Count(model interface{}, where interface{}) (int, error) {
-	cnt := 0
-	rdb := h.db.Model(model).Where(where).Count(&cnt)
-	return cnt, rdb.Error
-}
-
-// Exist: db.Model(model).Where(where).Count(&cnt)
-func (h *Helper) Exist(model interface{}, where interface{}) (bool, error) {
-	cnt, err := h.Count(model, where)
-	if err != nil {
-		return false, err
-	}
-	return cnt > 0, nil
-}
-
-// IsMySQL checks the dialect of db is "mysql".
+// IsMySQL checks if the dialect of given gorm.DB is "mysql".
 func IsMySQL(db *gorm.DB) bool {
 	return db.Dialect().GetName() == "mysql"
 }
 
-// Reference from http://go-database-sql.org/errors.html and https://github.com/VividCortex/mysqlerr/blob/master/mysqlerr.go.
+// IsSQLite checks if the dialect of given gorm.DB is "sqlite3".
+func IsSQLite(db *gorm.DB) bool {
+	return db.Dialect().GetName() == "sqlite3"
+}
+
+// IsPostgreSQL checks if the dialect of given gorm.DB is "postgres".
+func IsPostgreSQL(db *gorm.DB) bool {
+	return db.Dialect().GetName() == "postgres"
+}
+
+// Reference from http://go-database-sql.org/errors.html.
+//
+// MySQL: https://github.com/VividCortex/mysqlerr/blob/master/mysqlerr.go and https://dev.mysql.com/doc/mysql-errors/8.0/en/server-error-reference.htm,
+// SQLite: https://github.com/mattn/go-sqlite3/blob/master/error.go and http://www.sqlite.org/c3ref/c_abort_rollback.html,
+// PostgreSQL: https://github.com/lib/pq/blob/master/error.go and https://www.postgresql.org/docs/10/errcodes-appendix.html.
 const (
-	MySQLDuplicateEntryError = 1062 // ER_DUP_ENTRY
+	MySQLDuplicateEntryErrno       = 1062      // MySQLDuplicateEntryErrno is MySQL's ER_DUP_ENTRY errno.
+	SQLiteUniqueConstraintErrno    = 19 | 8<<8 // SQLiteUniqueConstraintErrno is SQLite's CONSTRAINT_UNIQUE extended errno.
+	PostgreSQLUniqueViolationErrno = "23505"   // PostgreSQLUniqueViolationErrno is PostgreSQL's unique_violation errno.
 )
 
-// IsMySQLDuplicateEntryError checks if err is mysql ER_DUP_ENTRY.
+// IsMySQLDuplicateEntryError checks if err is MySQL's ER_DUP_ENTRY error.
 func IsMySQLDuplicateEntryError(err error) bool {
-	if err == nil {
-		return false
-	}
 	mysqlErr, ok := err.(*mysql.MySQLError)
-	return ok && mysqlErr.Number == MySQLDuplicateEntryError
+	return ok && mysqlErr.Number == MySQLDuplicateEntryErrno
 }
 
-// QueryErr checks gorm.DB's query result.
-func QueryErr(rdb *gorm.DB) (bool, error) {
-	if rdb.RecordNotFound() {
-		return false, nil // not found
-	} else if rdb.Error != nil {
-		return false, rdb.Error // failed
+// IsSQLiteUniqueConstraintError checks if err is SQLite's ErrConstraintUnique error.
+func IsSQLiteUniqueConstraintError(err error) bool {
+	sqliteErr, ok := err.(sqlite3.Error)
+	return ok && sqliteErr.ExtendedCode == SQLiteUniqueConstraintErrno
+}
+
+// IsPostgreSQLUniqueViolationError checks if err is PostgreSQL's unique_violation error.
+func IsPostgreSQLUniqueViolationError(err error) bool {
+	postgresErr, ok := err.(pq.Error)
+	return ok && postgresErr.Code == PostgreSQLUniqueViolationErrno
+}
+
+// QueryErr checks gorm.DB query result, will only return xstatus.DbNotFound, xstatus.DbFailed and xstatus.DbSuccess.
+func QueryErr(rdb *gorm.DB) (xstatus.DbStatus, error) {
+	switch {
+	case rdb.RecordNotFound():
+		return xstatus.DbNotFound, nil // not found
+	case rdb.Error != nil:
+		return xstatus.DbFailed, rdb.Error // failed
 	}
-
-	return true, nil
+	return xstatus.DbSuccess, nil
 }
 
-// CreateErr checks gorm.DB's create result,
-// only return xstatus.DbSuccess, xstatus.DbExisted and xstatus.DbFailed.
+// CreateErr checks gorm.DB create result, will only return xstatus.DbExisted, xstatus.DbFailed and xstatus.DbSuccess.
 func CreateErr(rdb *gorm.DB) (xstatus.DbStatus, error) {
-	if IsMySQL(rdb) && IsMySQLDuplicateEntryError(rdb.Error) {
+	switch {
+	case IsMySQL(rdb) && IsMySQLDuplicateEntryError(rdb.Error),
+		IsSQLite(rdb) && IsSQLiteUniqueConstraintError(rdb.Error),
+		IsPostgreSQL(rdb) && IsPostgreSQLUniqueViolationError(rdb.Error):
 		return xstatus.DbExisted, rdb.Error // duplicate
-	} else if rdb.Error != nil {
+	case rdb.Error != nil:
 		return xstatus.DbFailed, rdb.Error // failed
-	} else if rdb.RowsAffected == 0 {
-		return xstatus.DbFailed, fmt.Errorf("unknown error when create") // failed
 	}
-
 	return xstatus.DbSuccess, nil
 }
 
-// UpdateErr checks gorm.DB's update result,
-// only return xstatus.DbSuccess, xstatus.DbExisted, xstatus.DbFailed and xstatus.DbNotFound.
+// UpdateErr checks gorm.DB update result, will only return xstatus.DbExisted, xstatus.DbFailed, xstatus.DbNotFound and xstatus.DbSuccess.
 func UpdateErr(rdb *gorm.DB) (xstatus.DbStatus, error) {
-	if IsMySQL(rdb) && IsMySQLDuplicateEntryError(rdb.Error) {
+	switch {
+	case IsMySQL(rdb) && IsMySQLDuplicateEntryError(rdb.Error),
+		IsSQLite(rdb) && IsSQLiteUniqueConstraintError(rdb.Error),
+		IsPostgreSQL(rdb) && IsPostgreSQLUniqueViolationError(rdb.Error):
 		return xstatus.DbExisted, rdb.Error // duplicate
-	} else if rdb.Error != nil {
+	case rdb.Error != nil:
 		return xstatus.DbFailed, rdb.Error // failed
-	} else if rdb.RowsAffected == 0 {
+	case rdb.RowsAffected == 0:
 		return xstatus.DbNotFound, nil // not found
 	}
-
 	return xstatus.DbSuccess, nil
 }
 
-// DeleteErr checks gorm.DB's delete result,
-// only return xstatus.DbSuccess, xstatus.DbFailed and xstatus.DbNotFound.
+// DeleteErr checks gorm.DB delete result, will only return xstatus.DbFailed, xstatus.DbNotFound and xstatus.DbSuccess.
 func DeleteErr(rdb *gorm.DB) (xstatus.DbStatus, error) {
-	if rdb.Error != nil {
+	switch {
+	case rdb.Error != nil:
 		return xstatus.DbFailed, rdb.Error // failed
-	} else if rdb.RowsAffected == 0 {
+	case rdb.RowsAffected == 0:
 		return xstatus.DbNotFound, nil // not found
 	}
-
 	return xstatus.DbSuccess, nil
 }
 
-// OrderByFunc generates a handler function `func(string) string` from xproperty.PropertyDict.
-func OrderByFunc(p xproperty.PropertyDict) func(source string) string {
-	return func(source string) string {
-		if source == "" {
-			return ""
-		}
+// PropertyValue represents a PO entity's property mapping rule.
+type PropertyValue = orderby.PropertyValue
 
-		result := make([]string, 0)
-		for _, src := range strings.Split(source, ",") {
-			src = strings.TrimSpace(src)
-			if src == "" {
-				continue
-			}
-			srcSp := strings.Split(src, " ")
-			if len(srcSp) > 2 {
-				continue
-			}
+// PropertyDict represents a DTO-PO PropertyValue dictionary, used in GenerateOrderByExp.
+type PropertyDict = orderby.PropertyDict
 
-			src = srcSp[0]
-			reverse := false
-			if len(srcSp) == 2 {
-				reverse = strings.ToUpper(srcSp[1]) == "DESC"
-			}
+// NewPropertyValue creates a PropertyValue by given reverse and destinations.
+func NewPropertyValue(reverse bool, destinations ...string) *PropertyValue {
+	return orderby.NewPropertyValue(reverse, destinations...)
+}
 
-			dest, ok := p[src]
-			if !ok || dest == nil || len(dest.Destinations) == 0 {
-				continue
-			}
-			if dest.Revert {
-				reverse = !reverse
-			}
-			for _, prop := range dest.Destinations {
-				if !reverse {
-					prop += " ASC"
-				} else {
-					prop += " DESC"
-				}
-				result = append(result, prop)
-			}
-		}
-
-		return strings.Join(result, ", ")
-	}
+// GenerateOrderByExp returns a generated orderBy expresion by given source dto order string (split by ",", such as "name desc, age asc") and PropertyDict.
+// The generated expression is in mysql-sql and neo4j-cypher style, that is "xx ASC", "xx DESC".
+func GenerateOrderByExp(source string, dict PropertyDict) string {
+	return orderby.GenerateOrderByExp(source, dict)
 }

@@ -1,33 +1,61 @@
 # xgorm
 
-### Functions
+## Dependencies
 
-#### Normal
++ github.com/Aoi-hosizora/ahlib
++ github.com/jinzhu/gorm
++ github.com/go-sql-driver/mysql
++ github.com/mattn/go-sqlite3 (cgo)
++ github.com/lib/pq
++ github.com/sirupsen/logrus
+
+## Documents
+
+### Types
+
++ `type GormTime struct`
++ `type GormTime2 struct`
++ `type PropertyValue struct`
++ `type PropertyDict map`
++ `type ILogger interface`
++ `type SilenceLogger struct`
++ `type LogrusLogger struct`
++ `type LoggerLogger struct`
+
+### Variables
+
++ None
+
+### Constants
 
 + `const DefaultDeletedAtTimestamp string`
-+ `type GormTime3 struct {}`
-+ `type GormTime2 struct {}`
-+ `HookDeletedAt(db *gorm.DB, deletedAtTimestamp string)`
-+ `type SilenceLogger struct{}`
-+ `NewSilenceLogger() *GormSilenceLogger`
-+ `type LogrusLogger struct {}`
-+ `NewLogrusLogger(logger *logrus.Logger) *GormLogrus`
-+ `type StdLogLogger struct {}`
-+ `NewStdLogLogger(logger *log.Logger) *GormLogger`
++ `const MySQLDuplicateEntryErrno int`
++ `const SQLiteUniqueConstraintErrno int`
++ `const PostgreSQLUniqueViolationErrno string`
 
-#### Helper
+### Functions
 
-+ `type Helper struct {}`
-+ `WithDB(db *gorm.DB) *Helper`
-+ `(h *Helper) GetDB() *gorm.DB`
-+ `(h *Helper) Pagination(limit int32, page int32) *gorm.DB`
-+ `(h *Helper) Count(model interface{}, where interface{}) (uint64, error)`
-+ `(h *Helper) Exist(model interface{}, where interface{}) (bool, error)`
-+ `IsMySQL(db *gorm.DB) bool`
-+ `const MySQLDuplicateEntryError int`
-+ `IsMySQLDuplicateEntryError(err error) bool`
-+ `QueryErr(rdb *gorm.DB) (bool, error)`
-+ `CreateErr(rdb *gorm.DB) (xstatus.DbStatus, error)`
-+ `UpdateErr(rdb *gorm.DB) (xstatus.DbStatus, error)`
-+ `DeleteErr(rdb *gorm.DB) (xstatus.DbStatus, error)`
-+ `OrderByFunc(p xproperty.PropertyDict) func(source string) string`
++ `func HookDeletedAt(db *gorm.DB, deletedAtTimestamp string)`
++ `func IsMySQL(db *gorm.DB) bool`
++ `func IsSQLite(db *gorm.DB) bool`
++ `func IsPostgreSQL(db *gorm.DB) bool`
++ `func IsMySQLDuplicateEntryError(err error) bool`
++ `func IsSQLiteUniqueConstraintError(err error) bool`
++ `func IsPostgreSQLUniqueViolationError(err error) bool`
++ `func QueryErr(rdb *gorm.DB) (xstatus.DbStatus, error)`
++ `func CreateErr(rdb *gorm.DB) (xstatus.DbStatus, error)`
++ `func UpdateErr(rdb *gorm.DB) (xstatus.DbStatus, error)`
++ `func DeleteErr(rdb *gorm.DB) (xstatus.DbStatus, error)`
++ `func NewPropertyValue(reverse bool, destinations ...string) *PropertyValue`
++ `func GenerateOrderByExp(source string, dict PropertyDict) string`
++ `func NewSilenceLogger() *SilenceLogger`
++ `func NewLogrusLogger(logger *logrus.Logger) *LogrusLogger`
++ `func NewLoggerLogger(logger logrus.StdLogger) *LoggerLogger`
+
+### Methods
+
++ `func (p *PropertyValue) Destinations() []string`
++ `func (p *PropertyValue) Reverse() bool`
++ `func (g *SilenceLogger) Print(...interface{})`
++ `func (g *LogrusLogger) Print(v ...interface{})`
++ `func (g *LoggerLogger) Print(v ...interface{})`
