@@ -16,6 +16,29 @@ type ILogger interface {
 	Print(v ...interface{})
 }
 
+// loggerOptions represents some options for logger, set by LoggerOption.
+type loggerOptions struct {
+	logInfo  bool
+	logOther bool
+}
+
+// LoggerOption represents an option for logger, created by WithXXX functions.
+type LoggerOption func(*loggerOptions)
+
+// WithLogInfo returns a LoggerOption with logInfo switcher to do log for [INFO], defaults to true.
+func WithLogInfo(logInfo bool) LoggerOption {
+	return func(o *loggerOptions) {
+		o.logInfo = logInfo
+	}
+}
+
+// WithLogOther returns a LoggerOption with logOther switcher to do log for other type, such as [LOG], defaults to true.
+func WithLogOther(logOther bool) LoggerOption {
+	return func(o *loggerOptions) {
+		o.logOther = logOther
+	}
+}
+
 // SilenceLogger represents a gorm's logger, used to hide "SQL" and "INFO" logs. Note that `gorm.DB.LogMode(false)` will only hide "SQL" message.
 type SilenceLogger struct{}
 
@@ -30,33 +53,53 @@ func NewSilenceLogger() *SilenceLogger {
 
 // LogrusLogger represents a gorm's logger, used to log "SQL" and "INFO" message to logrus.Logger.
 type LogrusLogger struct {
-	logger *logrus.Logger
+	logger  *logrus.Logger
+	options *loggerOptions
 }
 
-// NewLogrusLogger creates a new LogrusLogger using given logrus.Logger.
+// NewLogrusLogger creates a new LogrusLogger using given logrus.Logger and LoggerOption-s.
 // Example:
 // 	db, err := gorm.Open("mysql", dsl)
 // 	db.LogMode(true) // must be true
 // 	l := logrus.New()
 // 	l.SetFormatter(&logrus.TextFormatter{})
 // 	db.SetLogger(xgorm.NewLogrusLogger(l))
-func NewLogrusLogger(logger *logrus.Logger) *LogrusLogger {
-	return &LogrusLogger{logger: logger}
+func NewLogrusLogger(logger *logrus.Logger, options ...LoggerOption) *LogrusLogger {
+	opt := &loggerOptions{
+		logInfo:  true,
+		logOther: true,
+	}
+	for _, op := range options {
+		if op != nil {
+			op(opt)
+		}
+	}
+	return &LogrusLogger{logger: logger, options: opt}
 }
 
 // LoggerLogger represents a gorm's logger, used to log "SQL" and "INFO" message to logrus.StdLogger.
 type LoggerLogger struct {
-	logger logrus.StdLogger
+	logger  logrus.StdLogger
+	options *loggerOptions
 }
 
-// NewLoggerLogger creates a new LoggerLogger using given logrus.StdLogger.
+// NewLoggerLogger creates a new LoggerLogger using given logrus.StdLogger and LoggerOption-s.
 // Example:
 // 	db, err := gorm.Open("mysql", dsl)
 // 	db.LogMode(true) // must be true
 // 	l := log.New(os.Stderr, "", log.LstdFlags)
 // 	db.SetLogger(xgorm.NewLoggerLogger(l))
-func NewLoggerLogger(logger logrus.StdLogger) *LoggerLogger {
-	return &LoggerLogger{logger: logger}
+func NewLoggerLogger(logger logrus.StdLogger, options ...LoggerOption) *LoggerLogger {
+	opt := &loggerOptions{
+		logInfo:  true,
+		logOther: true,
+	}
+	for _, op := range options {
+		if op != nil {
+			op(opt)
+		}
+	}
+	return &LoggerLogger{logger: logger, options: opt}
 }
 
 // Print does nothing for log.
@@ -69,8 +112,10 @@ func (g *LogrusLogger) Print(v ...interface{}) {
 	}
 
 	// info & sql & ...
-	msg, fields := formatLoggerAndFields(v)
-	g.logger.WithFields(fields).Info(msg)
+	msg, fields := formatLoggerAndFields(v, g.options)
+	if msg != "" && len(fields) != 0 {
+		g.logger.WithFields(fields).Info(msg)
+	}
 }
 
 // Print logs to logrus.StdLogger, see gorm.LogFormatter for details.
@@ -80,8 +125,10 @@ func (g *LoggerLogger) Print(v ...interface{}) {
 	}
 
 	// info & sql & ...
-	msg, _ := formatLoggerAndFields(v)
-	g.logger.Print(msg)
+	msg, _ := formatLoggerAndFields(v, g.options)
+	if msg != "" {
+		g.logger.Print(msg)
+	}
 }
 
 // formatLoggerAndFields formats interface{}-s to logger string and logrus.Fields.
@@ -91,12 +138,15 @@ func (g *LoggerLogger) Print(v ...interface{}) {
 // 	[Gorm]       1 |     1.9957ms | SELECT * FROM `tbl_test`   ORDER BY `tbl_test`.`id` ASC LIMIT 1 | F:/Projects/ahlib-db/xgorm/xgorm_test.go:48
 // 	      |-------| |------------| |---------------------------------------------------------------| |-------------------------------------------|
 // 	          7           12                                      ...                                                       ...
-func formatLoggerAndFields(v []interface{}) (string, logrus.Fields) {
+func formatLoggerAndFields(v []interface{}, options *loggerOptions) (string, logrus.Fields) {
 	var msg string
 	var fields logrus.Fields
 
 	if len(v) == 2 {
 		// info
+		if !options.logInfo {
+			return "", nil
+		}
 		fields = logrus.Fields{
 			"module": "gorm",
 			"type":   v[0],
@@ -105,6 +155,9 @@ func formatLoggerAndFields(v []interface{}) (string, logrus.Fields) {
 		msg = fmt.Sprintf("[Gorm] %v", v[1])
 	} else if v[0] != "sql" {
 		// other
+		if !options.logOther {
+			return "", nil
+		}
 		s := fmt.Sprint(v[2:]...)
 		fields = logrus.Fields{
 			"module":  "gorm",

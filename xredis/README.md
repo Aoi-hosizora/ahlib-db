@@ -10,6 +10,7 @@
 ### Types
 
 + `type ILogger interface`
++ `type LoggerOption func`
 + `type SilenceLogger struct`
 + `type LogrusLogger struct`
 + `type LoggerLogger struct`
@@ -27,6 +28,7 @@
 + `func DelAll(client *redis.Client, pattern string) (tot, del int, err error)`
 + `func SetAll(client *redis.Client, keys, values []string) (tot, add int, err error)`
 + `func SetExAll(client *redis.Client, keys, values []string, expirations []int64) (tot, add int, err error)`
++ `func WithLogErr(logErr bool) LoggerOption`
 + `func NewSilenceLogger() *SilenceLogger`
 + `func NewLogrusLogger(logger *logrus.Logger) *LogrusLogger`
 + `func NewLoggerLogger(logger logrus.StdLogger) *LoggerLogger`

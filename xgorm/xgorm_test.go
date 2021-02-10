@@ -184,7 +184,10 @@ func testLogger(t *testing.T, giveDialect, giveParam string) {
 		{"default", true, nil},
 		{"silence", true, NewSilenceLogger()},
 		{"logrus", true, NewLogrusLogger(l1)},
+		{"logrus_no_info", true, NewLogrusLogger(l1, WithLogInfo(false))},
+		{"logrus_no_other", true, NewLogrusLogger(l1, WithLogOther(false))},
 		{"logger", true, NewLoggerLogger(l2)},
+		{"logger_no_info_other", true, NewLoggerLogger(l2, WithLogInfo(false), WithLogOther(false))},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			db, err := gorm.Open(giveDialect, giveParam)

@@ -18,6 +18,7 @@
 + `type PropertyValue struct`
 + `type PropertyDict map`
 + `type ILogger interface`
++ `type LoggerOption func`
 + `type SilenceLogger struct`
 + `type LogrusLogger struct`
 + `type LoggerLogger struct`
@@ -48,9 +49,11 @@
 + `func DeleteErr(rdb *gorm.DB) (xstatus.DbStatus, error)`
 + `func NewPropertyValue(reverse bool, destinations ...string) *PropertyValue`
 + `func GenerateOrderByExp(source string, dict PropertyDict) string`
++ `func WithLogInfo(logInfo bool) LoggerOption`
++ `func WithLogOther(logOther bool) LoggerOption`
 + `func NewSilenceLogger() *SilenceLogger`
-+ `func NewLogrusLogger(logger *logrus.Logger) *LogrusLogger`
-+ `func NewLoggerLogger(logger logrus.StdLogger) *LoggerLogger`
++ `func NewLogrusLogger(logger *logrus.Logger, options ...LoggerOption) *LogrusLogger`
++ `func NewLoggerLogger(logger logrus.StdLogger, options ...LoggerOption) *LoggerLogger`
 
 ### Methods
 
