@@ -6,7 +6,6 @@ import (
 	"github.com/go-sql-driver/mysql"
 	"github.com/jinzhu/gorm"
 	"github.com/lib/pq"
-	"github.com/mattn/go-sqlite3"
 )
 
 // IsMySQL checks if the dialect of given gorm.DB is "mysql".
@@ -41,12 +40,6 @@ func IsMySQLDuplicateEntryError(err error) bool {
 	return ok && mysqlErr.Number == MySQLDuplicateEntryErrno
 }
 
-// IsSQLiteUniqueConstraintError checks if err is SQLite's ErrConstraintUnique error.
-func IsSQLiteUniqueConstraintError(err error) bool {
-	sqliteErr, ok := err.(sqlite3.Error)
-	return ok && sqliteErr.ExtendedCode == SQLiteUniqueConstraintErrno
-}
-
 // IsPostgreSQLUniqueViolationError checks if err is PostgreSQL's unique_violation error.
 func IsPostgreSQLUniqueViolationError(err error) bool {
 	postgresErr, ok := err.(pq.Error)
@@ -60,34 +53,6 @@ func QueryErr(rdb *gorm.DB) (xstatus.DbStatus, error) {
 		return xstatus.DbNotFound, nil // not found
 	case rdb.Error != nil:
 		return xstatus.DbFailed, rdb.Error // failed
-	}
-	return xstatus.DbSuccess, nil
-}
-
-// CreateErr checks gorm.DB create result, will only return xstatus.DbExisted, xstatus.DbFailed and xstatus.DbSuccess.
-func CreateErr(rdb *gorm.DB) (xstatus.DbStatus, error) {
-	switch {
-	case IsMySQL(rdb) && IsMySQLDuplicateEntryError(rdb.Error),
-		IsSQLite(rdb) && IsSQLiteUniqueConstraintError(rdb.Error),
-		IsPostgreSQL(rdb) && IsPostgreSQLUniqueViolationError(rdb.Error):
-		return xstatus.DbExisted, rdb.Error // duplicate
-	case rdb.Error != nil:
-		return xstatus.DbFailed, rdb.Error // failed
-	}
-	return xstatus.DbSuccess, nil
-}
-
-// UpdateErr checks gorm.DB update result, will only return xstatus.DbExisted, xstatus.DbFailed, xstatus.DbNotFound and xstatus.DbSuccess.
-func UpdateErr(rdb *gorm.DB) (xstatus.DbStatus, error) {
-	switch {
-	case IsMySQL(rdb) && IsMySQLDuplicateEntryError(rdb.Error),
-		IsSQLite(rdb) && IsSQLiteUniqueConstraintError(rdb.Error),
-		IsPostgreSQL(rdb) && IsPostgreSQLUniqueViolationError(rdb.Error):
-		return xstatus.DbExisted, rdb.Error // duplicate
-	case rdb.Error != nil:
-		return xstatus.DbFailed, rdb.Error // failed
-	case rdb.RowsAffected == 0:
-		return xstatus.DbNotFound, nil // not found
 	}
 	return xstatus.DbSuccess, nil
 }
