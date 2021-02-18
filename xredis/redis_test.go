@@ -42,30 +42,27 @@ func TestHelper(t *testing.T) {
 			client.Set(context.Background(), "test_b", "test_bbb", 0)
 			client.Set(context.Background(), "test_c", "test_ccc", 0)
 
-			tot, del, err := DelAll(client, "test_")
+			tot, err := DelAll(client, context.Background(), "test_")
 			if tc.wantErr {
 				xtesting.NotNil(t, err)
 			} else {
-				xtesting.Equal(t, tot, 0)
-				xtesting.Equal(t, del, 0)
+				xtesting.Equal(t, tot, int64(0))
 				xtesting.Nil(t, err)
 			}
 
-			tot, del, err = DelAll(client, "test_a")
+			tot, err = DelAll(client, context.Background(), "test_a")
 			if tc.wantErr {
 				xtesting.NotNil(t, err)
 			} else {
-				xtesting.Equal(t, tot, 1)
-				xtesting.Equal(t, del, 1)
+				xtesting.Equal(t, tot, int64(1))
 				xtesting.Nil(t, err)
 			}
 
-			tot, del, err = DelAll(client, "test_*")
+			tot, err = DelAll(client, context.Background(), "test_*")
 			if tc.wantErr {
 				xtesting.NotNil(t, err)
 			} else {
-				xtesting.Equal(t, tot, 2)
-				xtesting.Equal(t, del, 2)
+				xtesting.Equal(t, tot, int64(2))
 				xtesting.Nil(t, err)
 			}
 		})
@@ -81,55 +78,15 @@ func TestHelper(t *testing.T) {
 				{[]string{}, []string{"v"}, false},
 				{[]string{"test_a", "test_b", "test_c"}, []string{"test_aaa", "test_bbb", "test_ccc"}, !tc.wantErr /* && true */},
 			} {
-				tot, add, err := SetAll(client, ttc.giveKeys, ttc.giveValues)
+				tot, err := SetAll(client, context.Background(), ttc.giveKeys, ttc.giveValues)
 				if !ttc.wantOk {
 					xtesting.NotNil(t, err)
 				} else {
 					xtesting.Nil(t, err)
-					xtesting.Equal(t, tot, len(ttc.giveKeys))
-					xtesting.Equal(t, add, len(ttc.giveKeys))
+					xtesting.Equal(t, tot, int64(len(ttc.giveKeys)))
 					for idx := range ttc.giveKeys {
 						k, v := ttc.giveKeys[idx], ttc.giveValues[idx]
 						xtesting.Equal(t, client.Get(context.Background(), k).Val(), v)
-					}
-				}
-			}
-		})
-
-		t.Run("SetExAll", func(t *testing.T) {
-			for _, ttc := range []struct {
-				giveKeys   []string
-				giveValues []string
-				giveExs    []int64
-				wantOk     bool
-			}{
-				{[]string{}, []string{}, []int64{}, true},
-				{[]string{"k"}, []string{}, []int64{0}, false},
-				{[]string{}, []string{"v"}, []int64{0}, false},
-				{[]string{"k"}, []string{"v"}, []int64{}, false},
-				{[]string{"test_a", "test_b", "test_c"}, []string{"test_aaa", "test_bbb", "test_ccc"}, []int64{1, 1, 1}, !tc.wantErr /* && true */},
-			} {
-				tot, add, err := SetExAll(client, ttc.giveKeys, ttc.giveValues, ttc.giveExs)
-				if !ttc.wantOk {
-					xtesting.NotNil(t, err)
-				} else {
-					xtesting.Nil(t, err)
-					xtesting.Equal(t, tot, len(ttc.giveKeys))
-					xtesting.Equal(t, add, len(ttc.giveKeys))
-					for idx := range ttc.giveKeys {
-						k, v := ttc.giveKeys[idx], ttc.giveValues[idx]
-						xtesting.Equal(t, client.Get(context.Background(), k).Val(), v)
-					}
-
-					maxWait := int64(-1)
-					for _, s := range ttc.giveExs {
-						if s > maxWait {
-							maxWait = s
-						}
-					}
-					time.Sleep(time.Second * time.Duration(maxWait+1))
-					for idx := range ttc.giveKeys {
-						xtesting.NotNil(t, client.Get(context.Background(), ttc.giveKeys[idx]).Err())
 					}
 				}
 			}
@@ -164,9 +121,10 @@ func TestLogger(t *testing.T) {
 				_, _ = tc.logger.BeforeProcessPipeline(context.Background(), nil)
 				_ = tc.logger.AfterProcessPipeline(context.Background(), nil)
 				_ = tc.logger.AfterProcess(context.Background(), nil)
+				NewSilenceLogger().Printf(context.TODO(), "")
 			}
 
-			client.Get(context.Background(), "test" )     // String err
+			client.Get(context.Background(), "test")               // String err
 			client.Set(context.Background(), "test", "test", 0)    // Status
 			client.Get(context.Background(), "test")               // String
 			client.Exists(context.Background(), "test", "xxx")     // Bool
@@ -186,17 +144,19 @@ func TestLogger(t *testing.T) {
 			client.Del(context.Background(), "F")                       // Int
 			client.Del(context.Background(), "I")                       // Int
 
-			client.Scan(context.Background(), 0, "test", 10)                             // Scan
+			client.Scan(context.Background(), 0, "test", 10) // Scan
 			defer client.Del(context.Background(), "myhash")
-			client.HSet(context.Background(), "myhash", "1", "111")                      // IntCmd
-			client.HSet(context.Background(), "myhash", "2", "222")                      // IntCmd
-			client.HGet(context.Background(), "myhash", "1")                             // StringCmd
-			client.HGetAll(context.Background(), "myhash")                               // StringStringMapCmd
+			client.HSet(context.Background(), "myhash", "1", "111") // IntCmd
+			client.HSet(context.Background(), "myhash", "2", "222") // IntCmd
+			client.HGet(context.Background(), "myhash", "1")        // StringCmd
+			client.HGetAll(context.Background(), "myhash")          // StringStringMapCmd
+			client.HExists(context.Background(), "myhash", "1")     // BoolCmd
+			client.HExists(context.Background(), "myhash", "0")     // BoolCmd
 			defer client.Del(context.Background(), "myset")
-			client.SAdd(context.Background(), "myset", "1", "2", "3")                    // IntCmd
-			client.SMembers(context.Background(), "myset")                               // StringSliceCmd
-			client.SPop(context.Background(), "myset")                                   // StringCmd
-			client.SMembersMap(context.Background(), "myset")                            // StringStructMapCmd
+			client.SAdd(context.Background(), "myset", "1", "2", "3") // IntCmd
+			client.SMembers(context.Background(), "myset")            // StringSliceCmd
+			client.SPop(context.Background(), "myset")                // StringCmd
+			client.SMembersMap(context.Background(), "myset")         // StringStructMapCmd
 			defer client.Del(context.Background(), "myzset")
 			client.ZAdd(context.Background(), "myzset", &redis.Z{Score: 1, Member: "A"}) // IntCmd
 			client.ZAdd(context.Background(), "myzset", &redis.Z{Score: 2, Member: "B"}) // IntCmd
@@ -207,6 +167,7 @@ func TestLogger(t *testing.T) {
 			client.ScriptExists(context.Background(), "ScriptExists")                                 // BoolSliceCmd
 			client.SlowLogGet(context.Background(), 1)                                                // SlowLogCmd
 			client.Command(context.Background())                                                      // CommandsInfoCmd
+			client.PubSubNumSub(context.Background(), "")                                             // StringIntMapCmd
 		})
 	}
 }

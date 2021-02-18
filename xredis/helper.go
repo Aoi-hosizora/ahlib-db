@@ -4,73 +4,42 @@ import (
 	"context"
 	"errors"
 	"github.com/go-redis/redis/v8"
-	"time"
 )
 
-// DelAll deletes all keys from given pattern (KEYS -> DEL). This is an atomic operator and return err when failed.
-func DelAll(client *redis.Client, pattern string) (tot, del int, err error) {
-	keys, err := client.Keys(context.Background(), pattern).Result()
+// DelAll deletes all keys from given pattern (KEYS -> DEL). This is an atomic operator and it will return err when failed.
+func DelAll(client *redis.Client, ctx context.Context, pattern string) (tot int64, err error) {
+	keys, err := client.Keys(ctx, pattern).Result()
 	if err != nil {
-		return 0, 0, err
+		return 0, err
 	}
-	tot = len(keys)
-	if tot == 0 {
-		return 0, 0, nil
+	if len(keys) == 0 {
+		return 0, nil
 	}
 
-	cnt, err := client.Del(context.Background(), keys...).Result()
-	if err != nil {
-		return 0, 0, err
-	}
-	return tot, int(cnt), nil
+	return client.Del(ctx, keys...).Result()
 }
 
 var (
-	errDifferentKeyValueLength    = errors.New("xredis: different length of keys and values")
-	errDifferentKeyValueExpLength = errors.New("xredis: different length of keys, values and expirations")
+	errDifferentKeyValueLength = errors.New("xredis: different length of keys and values")
 )
 
-// SetAll sets all given key-value pairs (SET -> SET -> ...). This is a non-atomic operator, that means if there is a value failed to set,
-// no rollback will be done, and it will return the current added count and error value.
-func SetAll(client *redis.Client, keys, values []string) (tot, add int, err error) {
-	tot = len(keys)
-	if tot != len(values) {
-		return 0, 0, errDifferentKeyValueLength
+// SetAll sets all given key-value pairs (MSET). This is an atomic operator and it will return err when failed.
+func SetAll(client *redis.Client, ctx context.Context, keys, values []string) (tot int64, err error) {
+	l := len(keys)
+	if l != len(values) {
+		return 0, errDifferentKeyValueLength
+	}
+	if l == 0 {
+		return 0, nil
 	}
 
-	var someErr error
+	parameters := make([]interface{}, 0, l*2)
 	for idx, key := range keys {
-		val := values[idx]
-		e := client.Set(context.Background(), key, val, 0).Err()
-		if e == nil {
-			add++
-		} else if someErr == nil {
-			someErr = e
-		}
+		parameters = append(parameters, key, values[idx])
 	}
-
-	return tot, add, someErr
-}
-
-// SetExAll sets all given key-value-expiration pairs (SET -> SET -> ...), equals to SetAll with expiration in second. This is a non-atomic operator,
-// that means if there is a value failed to set, no rollback will be done, and it will return the current added count and error value.
-func SetExAll(client *redis.Client, keys, values []string, expirations []int64) (tot, add int, err error) {
-	tot = len(keys)
-	if tot != len(values) || tot != len(expirations) {
-		return 0, 0, errDifferentKeyValueExpLength
+	err = client.MSet(ctx, parameters...).Err()
+	if err != nil {
+		return 0, err
 	}
-
-	var someErr error
-	for idx, key := range keys {
-		val := values[idx]
-		ex := expirations[idx]
-		e := client.Set(context.Background(), key, val, time.Duration(ex*1e9)).Err()
-		if e == nil {
-			add++
-		} else if someErr == nil {
-			someErr = e
-		}
-	}
-
-	return tot, add, someErr
+	return int64(l), nil
 }

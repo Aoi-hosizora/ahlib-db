@@ -2,6 +2,7 @@ package xredis
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/go-redis/redis/v8"
 	"github.com/sirupsen/logrus"
@@ -169,11 +170,12 @@ func (l *LoggerLogger) AfterProcess(ctx context.Context, cmd redis.Cmder) error 
 
 // formatLoggerAndFields formats redis.Cmder and time.Duration to logger string, logrus.Fields and isError flag.
 // Logs like:
-// 	[Redis] dial tcp 127.0.0.1:6378: connectex: No connection could be made because the target machine actively refused it. | F:/Projects/ahlib-db/xredis/redis_test.go:59
-// 	[Redis]      3 |      995.5µs | keys tes* | F:/Projects/ahlib-db/xredis/redis_test.go:146
-// 	[Redis]     2i |      997.8µs | del test_ test_c | F:/Projects/ahlib-db/xredis/helper.go:21
-// 	[Redis]      F |      997.3µs | hexists test xxx | F:/Projects/ahlib-db/xredis/redis_test.go:141
-// 	[Redis]     OK |    25.9306ms | set 'test num' 1 | F:/Projects/ahlib-db/xredis/redis_test.go:59
+// 	[Redis] ERR invalid password | xxx | F:/Projects/ahlib-db/xredis/helper.go:40
+// 	[Redis]    Nil |   305.9909ms | GET test | F:/Projects/ahlib-db/xredis/redis_test.go:126
+// 	[Redis]      3 |      995.5µs | KEYS tes* | F:/Projects/ahlib-db/xredis/redis_test.go:146
+// 	[Redis]     2i |      997.8µs | DEL test_ test_c | F:/Projects/ahlib-db/xredis/helper.go:21
+// 	[Redis]      F |      997.3µs | HEXISTS test xxx | F:/Projects/ahlib-db/xredis/redis_test.go:141
+// 	[Redis]     OK |    25.9306ms | SET 'test num' 1 | F:/Projects/ahlib-db/xredis/redis_test.go:59
 // 	       |------| |------------| |----------------| |--------------------------------------------|
 // 	          6           12               ...                               ...
 func formatLoggerAndFields(cmd redis.Cmder, duration time.Duration, source string) (string, logrus.Fields, bool) {
@@ -181,22 +183,31 @@ func formatLoggerAndFields(cmd redis.Cmder, duration time.Duration, source strin
 	var fields logrus.Fields
 	var isErr bool
 
-	if err := cmd.Err(); err != nil {
+	err := cmd.Err()
+	isnil := errors.Is(err, redis.Nil)
+	if err != nil && !isnil {
 		// error
 		isErr = true
+		command := render(cmd.Args())
 		fields = logrus.Fields{
-			"module": "redis",
-			"error":  err,
-			"source": source,
+			"module":  "redis",
+			"command": command,
+			"error":   err,
+			"source":  source,
 		}
-		msg = fmt.Sprintf("[Redis] %v | %s", err, source)
+		msg = fmt.Sprintf("[Redis] %v | %s | %s", err, command, source)
 	} else {
 		// result
 		command := render(cmd.Args())
 		rows, status := parseCmd(cmd)
-		first := status // first field
-		if first == "" {
-			first = strconv.Itoa(rows)
+		first := "" // first field
+		if isnil {
+			first = "Nil" // Nil
+		} else {
+			first = status // OK | #
+			if first == "" {
+				first = strconv.Itoa(rows)
+			}
 		}
 
 		fields = logrus.Fields{
