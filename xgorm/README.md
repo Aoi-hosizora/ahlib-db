@@ -41,11 +41,11 @@
 + `func IsSQLite(db *gorm.DB) bool`
 + `func IsPostgreSQL(db *gorm.DB) bool`
 + `func IsMySQLDuplicateEntryError(err error) bool`
-+ `func IsSQLiteUniqueConstraintError(err error) bool`
++ `func IsSQLiteUniqueConstraintError(err error) bool // cgo`
 + `func IsPostgreSQLUniqueViolationError(err error) bool`
 + `func QueryErr(rdb *gorm.DB) (xstatus.DbStatus, error)`
-+ `func CreateErr(rdb *gorm.DB) (xstatus.DbStatus, error)`
-+ `func UpdateErr(rdb *gorm.DB) (xstatus.DbStatus, error)`
++ `func CreateErr(rdb *gorm.DB) (xstatus.DbStatus, error) // !cgo+cgo`
++ `func UpdateErr(rdb *gorm.DB) (xstatus.DbStatus, error) // !cgo+cgo`
 + `func DeleteErr(rdb *gorm.DB) (xstatus.DbStatus, error)`
 + `func NewPropertyValue(reverse bool, destinations ...string) *PropertyValue`
 + `func GenerateOrderByExp(source string, dict PropertyDict) string`
