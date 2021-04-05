@@ -2,10 +2,12 @@ package xgorm
 
 import (
 	"github.com/Aoi-hosizora/ahlib-db/internal/orderby"
+	"github.com/Aoi-hosizora/ahlib/xreflect"
 	"github.com/Aoi-hosizora/ahlib/xstatus"
 	"github.com/go-sql-driver/mysql"
 	"github.com/jinzhu/gorm"
 	"github.com/lib/pq"
+	"reflect"
 )
 
 // IsMySQL checks if the dialect of given gorm.DB is "mysql".
@@ -66,6 +68,24 @@ func DeleteErr(rdb *gorm.DB) (xstatus.DbStatus, error) {
 		return xstatus.DbNotFound, nil // not found
 	}
 	return xstatus.DbSuccess, nil
+}
+
+// NoLogger does a gorm.DB operator without logging using xgorm.NewSilenceLogger, and returns the returned rdb object.
+func NoLogger(db *gorm.DB, fn func(*gorm.DB) *gorm.DB) *gorm.DB {
+	dbElem := reflect.ValueOf(db).Elem()
+	logger := xreflect.GetUnexportedField(dbElem.FieldByName("logger"))
+	logMode := xreflect.GetUnexportedField(dbElem.FieldByName("logMode"))
+	db.SetLogger(NewSilenceLogger())
+	db.LogMode(false)
+
+	var rdb *gorm.DB
+	if fn != nil {
+		rdb = fn(db)
+	}
+
+	xreflect.SetUnexportedField(dbElem.FieldByName("logger"), logger)
+	xreflect.SetUnexportedField(dbElem.FieldByName("logMode"), logMode)
+	return rdb
 }
 
 // PropertyValue represents a PO entity's property mapping rule.

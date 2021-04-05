@@ -29,7 +29,7 @@ type GormTime2 struct {
 }
 
 // HookDeletedAt hooks gorm.DB to replace the soft-delete callback (including query, row_query, update, delete) using the new deletedAt timestamp.
-func HookDeletedAt(db *gorm.DB, deletedAtTimestamp string) {
+func HookDeletedAt(db *gorm.DB, deletedAtTimestamp string) *gorm.DB {
 	// query
 	db.Callback().Query().
 		Before("gorm:query").
@@ -48,6 +48,8 @@ func HookDeletedAt(db *gorm.DB, deletedAtTimestamp string) {
 	// delete <<<
 	db.Callback().Delete().
 		Replace("gorm:delete", deletedAtDeleteCallback(deletedAtTimestamp))
+
+	return db
 }
 
 // deletedAtQueryUpdateCallback is a callback for gorm:query, gorm:row_query, gorm:update used in HookDeletedAt.
