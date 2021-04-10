@@ -25,9 +25,11 @@
 
 ### Functions
 
-+ `func DelAll(client *redis.Client, ctx context.Context, pattern string) (tot int64, err error)`
-+ `func SetAll(client *redis.Client, ctx context.Context, keys, values []string) (tot int64, err error)`
++ `func DelAll(ctx context.Context, client *redis.Client, pattern string) (tot int64, err error)`
++ `func SetAll(ctx context.Context, client *redis.Client, keys, values []string) (tot int64, err error)`
 + `func WithLogErr(logErr bool) LoggerOption`
++ `func EnableLogger()`
++ `func DisableLogger()`
 + `func NewSilenceLogger() *SilenceLogger`
 + `func NewLogrusLogger(logger *logrus.Logger) *LogrusLogger`
 + `func NewLoggerLogger(logger logrus.StdLogger) *LoggerLogger`

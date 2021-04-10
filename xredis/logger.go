@@ -32,6 +32,19 @@ func WithLogErr(logErr bool) LoggerOption {
 	}
 }
 
+// _enable is a global switcher to control xredis logger behavior.
+var _enable = true
+
+// EnableLogger enables xredis logger to do any log.
+func EnableLogger() {
+	_enable = true
+}
+
+// DisableLogger disables xredis logger to do any log.
+func DisableLogger() {
+	_enable = false
+}
+
 // SilenceLogger represents a redis's logger, used to hide go-redis's info logger.
 type SilenceLogger struct{}
 
@@ -119,7 +132,7 @@ func (l *LogrusLogger) BeforeProcess(ctx context.Context, _ redis.Cmder) (contex
 func (l *LogrusLogger) AfterProcess(ctx context.Context, cmd redis.Cmder) error {
 	endTime := time.Now()
 	startTime, ok := ctx.Value(&_startTimeKey).(time.Time)
-	if !ok {
+	if !_enable || !ok {
 		return nil // ignore
 	}
 
@@ -154,7 +167,7 @@ func (l *LoggerLogger) BeforeProcess(ctx context.Context, _ redis.Cmder) (contex
 func (l *LoggerLogger) AfterProcess(ctx context.Context, cmd redis.Cmder) error {
 	endTime := time.Now()
 	startTime, ok := ctx.Value(&_startTimeKey).(time.Time)
-	if !ok {
+	if !_enable || !ok {
 		return nil // ignore
 	}
 

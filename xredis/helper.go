@@ -7,7 +7,7 @@ import (
 )
 
 // DelAll deletes all keys from given pattern (KEYS -> DEL). This is an atomic operator and it will return err when failed.
-func DelAll(client *redis.Client, ctx context.Context, pattern string) (tot int64, err error) {
+func DelAll(ctx context.Context, client *redis.Client, pattern string) (tot int64, err error) {
 	keys, err := client.Keys(ctx, pattern).Result()
 	if err != nil {
 		return 0, err
@@ -24,7 +24,7 @@ var (
 )
 
 // SetAll sets all given key-value pairs (MSET). This is an atomic operator and it will return err when failed.
-func SetAll(client *redis.Client, ctx context.Context, keys, values []string) (tot int64, err error) {
+func SetAll(ctx context.Context, client *redis.Client, keys, values []string) (tot int64, err error) {
 	l := len(keys)
 	if l != len(values) {
 		return 0, errDifferentKeyValueLength

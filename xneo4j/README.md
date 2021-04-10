@@ -51,6 +51,8 @@
 + `func NewPool(driver neo4j.Driver, dial DialHandler) *Pool`
 + `func WithSkip(skip int) LoggerOption`
 + `func WithCounterField(switcher bool) LoggerOption`
++ `func EnableLogger()`
++ `func DisableLogger()`
 + `func NewLogrusLogger(session neo4j.Session, logger *logrus.Logger, options ...LoggerOption) *LogrusLogger`
 + `func NewLoggerLogger(session neo4j.Session, logger logrus.StdLogger, options ...LoggerOption) *LoggerLogger`
 

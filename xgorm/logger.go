@@ -39,6 +39,19 @@ func WithLogOther(logOther bool) LoggerOption {
 	}
 }
 
+// _enable is a global switcher to control xgorm logger behavior.
+var _enable = true
+
+// EnableLogger enables xgorm logger to do any log.
+func EnableLogger() {
+	_enable = true
+}
+
+// DisableLogger disables xgorm logger to do any log.
+func DisableLogger() {
+	_enable = false
+}
+
 // SilenceLogger represents a gorm's logger, used to hide "SQL" and "INFO" logs. Note that `gorm.DB.LogMode(false)` will only hide "SQL" message.
 type SilenceLogger struct{}
 
@@ -107,7 +120,7 @@ func (g *SilenceLogger) Print(...interface{}) {}
 
 // Print logs to logrus.Logger, see gorm.LogFormatter for details.
 func (g *LogrusLogger) Print(v ...interface{}) {
-	if len(v) <= 1 {
+	if !_enable || len(v) <= 1 {
 		return
 	}
 
@@ -120,7 +133,7 @@ func (g *LogrusLogger) Print(v ...interface{}) {
 
 // Print logs to logrus.StdLogger, see gorm.LogFormatter for details.
 func (g *LoggerLogger) Print(v ...interface{}) {
-	if len(v) <= 1 {
+	if !_enable || len(v) <= 1 {
 		return
 	}
 

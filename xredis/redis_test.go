@@ -42,7 +42,7 @@ func TestHelper(t *testing.T) {
 			client.Set(context.Background(), "test_b", "test_bbb", 0)
 			client.Set(context.Background(), "test_c", "test_ccc", 0)
 
-			tot, err := DelAll(client, context.Background(), "test_")
+			tot, err := DelAll(context.Background(), client, "test_")
 			if tc.wantErr {
 				xtesting.NotNil(t, err)
 			} else {
@@ -50,7 +50,7 @@ func TestHelper(t *testing.T) {
 				xtesting.Nil(t, err)
 			}
 
-			tot, err = DelAll(client, context.Background(), "test_a")
+			tot, err = DelAll(context.Background(), client, "test_a")
 			if tc.wantErr {
 				xtesting.NotNil(t, err)
 			} else {
@@ -58,7 +58,7 @@ func TestHelper(t *testing.T) {
 				xtesting.Nil(t, err)
 			}
 
-			tot, err = DelAll(client, context.Background(), "test_*")
+			tot, err = DelAll(context.Background(), client, "test_*")
 			if tc.wantErr {
 				xtesting.NotNil(t, err)
 			} else {
@@ -78,7 +78,7 @@ func TestHelper(t *testing.T) {
 				{[]string{}, []string{"v"}, false},
 				{[]string{"test_a", "test_b", "test_c"}, []string{"test_aaa", "test_bbb", "test_ccc"}, !tc.wantErr /* && true */},
 			} {
-				tot, err := SetAll(client, context.Background(), ttc.giveKeys, ttc.giveValues)
+				tot, err := SetAll(context.Background(), client, ttc.giveKeys, ttc.giveValues)
 				if !ttc.wantOk {
 					xtesting.NotNil(t, err)
 				} else {
@@ -108,6 +108,7 @@ func TestLogger(t *testing.T) {
 		{"logrus_no_err", NewLogrusLogger(l1, WithLogErr(false))},
 		{"logger", NewLoggerLogger(l2)},
 		{"logger_no_err", NewLoggerLogger(l2, WithLogErr(false))},
+		{"disable", NewLogrusLogger(l1)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			client := redis.NewClient(&redis.Options{
@@ -121,7 +122,12 @@ func TestLogger(t *testing.T) {
 				_, _ = tc.logger.BeforeProcessPipeline(context.Background(), nil)
 				_ = tc.logger.AfterProcessPipeline(context.Background(), nil)
 				_ = tc.logger.AfterProcess(context.Background(), nil)
-				NewSilenceLogger().Printf(context.TODO(), "")
+				NewSilenceLogger().Printf(context.Background(), "")
+			}
+			if tc.name != "disable" {
+				EnableLogger()
+			} else {
+				DisableLogger()
 			}
 
 			client.Get(context.Background(), "test")               // String err

@@ -176,20 +176,19 @@ func testLogger(t *testing.T, giveDialect, giveParam string) {
 	l2 := log.New(os.Stderr, "", log.LstdFlags)
 
 	for _, tc := range []struct {
-		name     string
-		mode     bool
-		noLogger bool
-		logger   ILogger
+		name   string
+		mode   bool
+		logger ILogger
 	}{
-		{"disable mode", false, false, nil},
-		{"default", true, false, nil},
-		{"silence", true, false, NewSilenceLogger()},
-		{"logrus", true, false, NewLogrusLogger(l1)},
-		{"logrus_no_info", true, false, NewLogrusLogger(l1, WithLogInfo(false))},
-		{"logrus_no_other", true, false, NewLogrusLogger(l1, WithLogOther(false))},
-		{"logger", true, false, NewLoggerLogger(l2)},
-		{"logger_no_info_other", true, false, NewLoggerLogger(l2, WithLogInfo(false), WithLogOther(false))},
-		{"no_logger", true, true, NewLogrusLogger(l1)},
+		{"disable mode", false, nil},
+		{"default", true, nil},
+		{"silence", true, NewSilenceLogger()},
+		{"logrus", true, NewLogrusLogger(l1)},
+		{"logrus_no_info", true, NewLogrusLogger(l1, WithLogInfo(false))},
+		{"logrus_no_other", true, NewLogrusLogger(l1, WithLogOther(false))},
+		{"logger", true, NewLoggerLogger(l2)},
+		{"logger_no_info_other", true, NewLoggerLogger(l2, WithLogInfo(false), WithLogOther(false))},
+		{"disable", true, NewLogrusLogger(l1)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			db, err := gorm.Open(giveDialect, giveParam)
@@ -201,35 +200,25 @@ func testLogger(t *testing.T, giveDialect, giveParam string) {
 			if tc.logger != nil {
 				db.SetLogger(tc.logger)
 			}
-
-			var rdb *gorm.DB
-			if tc.noLogger {
-				NoLogger(db, func(db *gorm.DB) *gorm.DB { return HookDeletedAt(db, DefaultDeletedAtTimestamp) })
-				NoLogger(db, func(db *gorm.DB) *gorm.DB { return db.DropTableIfExists(&User{}) })
-				rdb = NoLogger(db, func(db *gorm.DB) *gorm.DB { return db.AutoMigrate(&User{}) })
+			if tc.name != "disable" {
+				EnableLogger()
 			} else {
-				HookDeletedAt(db, DefaultDeletedAtTimestamp) // log [info]
-				db.DropTableIfExists(&User{})
-				rdb = db.AutoMigrate(&User{})
+				DisableLogger()
 			}
+
+			HookDeletedAt(db, DefaultDeletedAtTimestamp) // log [info]
+			db.DropTableIfExists(&User{})
+			rdb := db.AutoMigrate(&User{})
 			if rdb.Error != nil {
 				log.Println(err)
 				t.FailNow()
 			}
 
-			if tc.noLogger {
-				NoLogger(db, func(db *gorm.DB) *gorm.DB { return db.Create(&User{Uid: 1, Name: "user1"}) })
-				NoLogger(db, func(db *gorm.DB) *gorm.DB { return db.Create(&User{Uid: 1, Name: "user1"}) })
-				NoLogger(db, func(db *gorm.DB) *gorm.DB { return db.Model(&User{}).Where(&User{Uid: 1}).First(&User{}) })
-				NoLogger(db, func(db *gorm.DB) *gorm.DB { return db.Model(&User{}).Where("name = ? OR name = ?", []byte("user1"), []byte{0x00, 0x01}).First(&User{}) })
-				NoLogger(db, func(db *gorm.DB) *gorm.DB { return db.Model(&User{}).Where("deleted_at = $1 OR deleted_at = $2", time.Time{}, nil).First(&User{}) })
-			} else {
-				db.Create(&User{Uid: 1, Name: "user1"})
-				db.Create(&User{Uid: 1, Name: "user1"}) // log [log]
-				db.Model(&User{}).Where(&User{Uid: 1}).First(&User{})
-				db.Model(&User{}).Where("name = ? OR name = ?", []byte("user1"), []byte{0x00, 0x01}).First(&User{}) // ?
-				db.Model(&User{}).Where("deleted_at = $1 OR deleted_at = $2", time.Time{}, nil).First(&User{})      // $
-			}
+			db.Create(&User{Uid: 1, Name: "user1"})
+			db.Create(&User{Uid: 1, Name: "user1"}) // log [log]
+			db.Model(&User{}).Where(&User{Uid: 1}).First(&User{})
+			db.Model(&User{}).Where("name = ? OR name = ?", []byte("user1"), []byte{0x00, 0x01}).First(&User{}) // ?
+			db.Model(&User{}).Where("deleted_at = $1 OR deleted_at = $2", time.Time{}, nil).First(&User{})      // $
 		})
 	}
 }

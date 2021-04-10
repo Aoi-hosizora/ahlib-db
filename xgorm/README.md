@@ -47,11 +47,12 @@
 + `func CreateErr(rdb *gorm.DB) (xstatus.DbStatus, error) // !cgo+cgo`
 + `func UpdateErr(rdb *gorm.DB) (xstatus.DbStatus, error) // !cgo+cgo`
 + `func DeleteErr(rdb *gorm.DB) (xstatus.DbStatus, error)`
-+ `func NoLogger(db *gorm.DB, fn func(*gorm.DB) *gorm.DB) *gorm.DB`
 + `func NewPropertyValue(reverse bool, destinations ...string) *PropertyValue`
 + `func GenerateOrderByExp(source string, dict PropertyDict) string`
 + `func WithLogInfo(logInfo bool) LoggerOption`
 + `func WithLogOther(logOther bool) LoggerOption`
++ `func EnableLogger()`
++ `func DisableLogger()`
 + `func NewSilenceLogger() *SilenceLogger`
 + `func NewLogrusLogger(logger *logrus.Logger, options ...LoggerOption) *LogrusLogger`
 + `func NewLoggerLogger(logger logrus.StdLogger, options ...LoggerOption) *LoggerLogger`

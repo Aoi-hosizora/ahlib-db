@@ -225,6 +225,7 @@ func TestLogger(t *testing.T) {
 	}{
 		{"logrus", NewLogrusLogger, l1},
 		{"logger", NewLoggerLogger, l2},
+		{"disable", NewLogrusLogger, l1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			driver, err := neo4j.NewDriver(neo4jParam, neo4j.BasicAuth(neo4jUser, neo4jPasswd, ""))
@@ -241,6 +242,11 @@ func TestLogger(t *testing.T) {
 				reflect.ValueOf(session), reflect.ValueOf(tc.l), reflect.ValueOf(WithCounterField(true)), reflect.ValueOf(WithSkip(1)),
 			})[0]
 			session = newSessionVal.Interface().(neo4j.Session)
+			if tc.name != "disable" {
+				EnableLogger()
+			} else {
+				DisableLogger()
+			}
 
 			_, _ = session.Run(`MATCH n RETURN n`, nil) // error
 			_, _ = session.Run(`MATCH (n) RETURN n LIMIT 1`, nil)

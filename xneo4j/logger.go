@@ -35,6 +35,19 @@ func WithCounterField(switcher bool) LoggerOption {
 	}
 }
 
+// _enable is a global switcher to control xneo4j logger behavior.
+var _enable = true
+
+// EnableLogger enables xneo4j logger to do any log.
+func EnableLogger() {
+	_enable = true
+}
+
+// DisableLogger disables xneo4j logger to do any log.
+func DisableLogger() {
+	_enable = false
+}
+
 // LogrusLogger represents a neo4j.Session, used to log neo4j cypher executing message to logrus.Logger.
 type LogrusLogger struct {
 	neo4j.Session
@@ -95,6 +108,9 @@ func NewLoggerLogger(session neo4j.Session, logger logrus.StdLogger, options ...
 // Run executes given cypher and params, and logs to logrus.Logger.
 func (l *LogrusLogger) Run(cypher string, params map[string]interface{}, configurers ...func(*neo4j.TransactionConfig)) (neo4j.Result, error) {
 	result, err := l.Session.Run(cypher, params, configurers...)
+	if !_enable {
+		return result, err
+	}
 
 	_, file, line, _ := runtime.Caller(l.options.skip)
 	source := fmt.Sprintf("%s:%d", file, line)
@@ -111,6 +127,9 @@ func (l *LogrusLogger) Run(cypher string, params map[string]interface{}, configu
 // Run executes given cypher and params, and logs to logrus.StdLogger.
 func (l *LoggerLogger) Run(cypher string, params map[string]interface{}, configurers ...func(*neo4j.TransactionConfig)) (neo4j.Result, error) {
 	result, err := l.Session.Run(cypher, params, configurers...)
+	if !_enable {
+		return result, err
+	}
 
 	_, file, line, _ := runtime.Caller(l.options.skip)
 	source := fmt.Sprintf("%s:%d", file, line)
