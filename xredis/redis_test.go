@@ -37,7 +37,22 @@ func TestHelper(t *testing.T) {
 		redis.SetLogger(NewSilenceLogger())
 		client.AddHook(NewLogrusLogger(l))
 
-		t.Run("DeleteAll", func(t *testing.T) {
+		t.Run("ScanAll", func(t *testing.T) {
+			client.Set(context.Background(), "test_a", "test_aaa", 0)
+			client.Set(context.Background(), "test_b", "test_bbb", 0)
+			client.Set(context.Background(), "test_c", "test_ccc", 0)
+			defer client.Del(context.Background(), "test_a", "test_b", "test_c")
+
+			keys, err := ScanAll(context.Background(), client, "test_*", 20)
+			if tc.wantErr {
+				xtesting.NotNil(t, err)
+			} else {
+				xtesting.ElementMatch(t, keys, []string{"test_a", "test_b", "test_c"})
+				xtesting.Nil(t, err)
+			}
+		})
+
+		t.Run("DelAll", func(t *testing.T) {
 			client.Set(context.Background(), "test_a", "test_aaa", 0)
 			client.Set(context.Background(), "test_b", "test_bbb", 0)
 			client.Set(context.Background(), "test_c", "test_ccc", 0)
@@ -67,28 +82,33 @@ func TestHelper(t *testing.T) {
 			}
 		})
 
-		t.Run("SetAll", func(t *testing.T) {
-			for _, ttc := range []struct {
-				giveKeys   []string
-				giveValues []string
-				wantOk     bool
-			}{
-				{[]string{}, []string{}, true},
-				{[]string{"k"}, []string{}, false},
-				{[]string{}, []string{"v"}, false},
-				{[]string{"test_a", "test_b", "test_c"}, []string{"test_aaa", "test_bbb", "test_ccc"}, !tc.wantErr /* && true */},
-			} {
-				tot, err := SetAll(context.Background(), client, ttc.giveKeys, ttc.giveValues)
-				if !ttc.wantOk {
-					xtesting.NotNil(t, err)
-				} else {
-					xtesting.Nil(t, err)
-					xtesting.Equal(t, tot, int64(len(ttc.giveKeys)))
-					for idx := range ttc.giveKeys {
-						k, v := ttc.giveKeys[idx], ttc.giveValues[idx]
-						xtesting.Equal(t, client.Get(context.Background(), k).Val(), v)
-					}
-				}
+		t.Run("DelAllByScan", func(t *testing.T) {
+			client.Set(context.Background(), "test_a", "test_aaa", 0)
+			client.Set(context.Background(), "test_b", "test_bbb", 0)
+			client.Set(context.Background(), "test_c", "test_ccc", 0)
+
+			tot, err := DelAllByScan(context.Background(), client, "test_", 20)
+			if tc.wantErr {
+				xtesting.NotNil(t, err)
+			} else {
+				xtesting.Equal(t, tot, int64(0))
+				xtesting.Nil(t, err)
+			}
+
+			tot, err = DelAllByScan(context.Background(), client, "test_a", 20)
+			if tc.wantErr {
+				xtesting.NotNil(t, err)
+			} else {
+				xtesting.Equal(t, tot, int64(1))
+				xtesting.Nil(t, err)
+			}
+
+			tot, err = DelAllByScan(context.Background(), client, "test_*", 20)
+			if tc.wantErr {
+				xtesting.NotNil(t, err)
+			} else {
+				xtesting.Equal(t, tot, int64(2))
+				xtesting.Nil(t, err)
 			}
 		})
 	}

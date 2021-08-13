@@ -2,11 +2,27 @@ package xredis
 
 import (
 	"context"
-	"errors"
 	"github.com/go-redis/redis/v8"
 )
 
-// DelAll deletes all keys from given pattern (KEYS -> DEL). This is an atomic operator and it will return err when failed.
+// ScanAll scans all keys from given pattern and scan count, is a wrapper function for SCAN.
+func ScanAll(ctx context.Context, client *redis.Client, match string, count int64) (keys []string, err error) {
+	cursor := uint64(0)
+	tempKeys := make([]string, 0)
+	for {
+		tempKeys, cursor, err = client.Scan(ctx, cursor, match, count).Result()
+		if err != nil {
+			return nil, err
+		}
+		keys = append(keys, tempKeys...)
+		if cursor == 0 {
+			break
+		}
+	}
+	return keys, err
+}
+
+// DelAll atomically deletes all keys from given pattern, using KEYS before DEL.
 func DelAll(ctx context.Context, client *redis.Client, pattern string) (tot int64, err error) {
 	keys, err := client.Keys(ctx, pattern).Result()
 	if err != nil {
@@ -19,27 +35,15 @@ func DelAll(ctx context.Context, client *redis.Client, pattern string) (tot int6
 	return client.Del(ctx, keys...).Result()
 }
 
-var (
-	errDifferentKeyValueLength = errors.New("xredis: different length of keys and values")
-)
-
-// SetAll sets all given key-value pairs (MSET). This is an atomic operator and it will return err when failed.
-func SetAll(ctx context.Context, client *redis.Client, keys, values []string) (tot int64, err error) {
-	l := len(keys)
-	if l != len(values) {
-		return 0, errDifferentKeyValueLength
-	}
-	if l == 0 {
-		return 0, nil
-	}
-
-	parameters := make([]interface{}, 0, l*2)
-	for idx, key := range keys {
-		parameters = append(parameters, key, values[idx])
-	}
-	err = client.MSet(ctx, parameters...).Err()
+// DelAllByScan atomically deletes all keys from given pattern, using SCAN before DEL.
+func DelAllByScan(ctx context.Context, client *redis.Client, pattern string, scanCount int64) (tot int64, err error) {
+	keys, err := ScanAll(ctx, client, pattern, scanCount)
 	if err != nil {
 		return 0, err
 	}
-	return int64(l), nil
+	if len(keys) == 0 {
+		return 0, nil
+	}
+
+	return client.Del(ctx, keys...).Result()
 }

@@ -183,7 +183,7 @@ func (l *LoggerLogger) AfterProcess(ctx context.Context, cmd redis.Cmder) error 
 
 // formatLoggerAndFields formats redis.Cmder and time.Duration to logger string, logrus.Fields and isError flag.
 // Logs like:
-// 	[Redis] ERR invalid password | xxx | F:/Projects/ahlib-db/xredis/helper.go:40
+// 	[Redis] ERR invalid password | SET test_a test_aaa | F:/Projects/ahlib-db/xredis/redis_test.go:41
 // 	[Redis]    Nil |   305.9909ms | GET test | F:/Projects/ahlib-db/xredis/redis_test.go:126
 // 	[Redis]      3 |      995.5µs | KEYS tes* | F:/Projects/ahlib-db/xredis/redis_test.go:146
 // 	[Redis]     2i |      997.8µs | DEL test_ test_c | F:/Projects/ahlib-db/xredis/helper.go:21

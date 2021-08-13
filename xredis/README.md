@@ -25,8 +25,9 @@
 
 ### Functions
 
++ `func ScanAll(ctx context.Context, client *redis.Client, match string, count int64) (keys []string, err error)`
 + `func DelAll(ctx context.Context, client *redis.Client, pattern string) (tot int64, err error)`
-+ `func SetAll(ctx context.Context, client *redis.Client, keys, values []string) (tot int64, err error)`
++ `func DelAllByScan(ctx context.Context, client *redis.Client, pattern string, scanCount int64) (tot int64, err error)`
 + `func WithLogErr(logErr bool) LoggerOption`
 + `func EnableLogger()`
 + `func DisableLogger()`
