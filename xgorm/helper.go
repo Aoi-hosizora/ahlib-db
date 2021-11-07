@@ -79,8 +79,8 @@ func NewPropertyValue(reverse bool, destinations ...string) *PropertyValue {
 	return orderby.NewPropertyValue(reverse, destinations...)
 }
 
-// GenerateOrderByExp returns a generated orderBy expresion by given source dto order string (split by ",", such as "name desc, age asc") and PropertyDict.
-// The generated expression is in mysql-sql and neo4j-cypher style, that is "xx ASC", "xx DESC".
+// GenerateOrderByExp returns a generated orderBy expression by given source dto order string (split by ",", such as "name desc, age asc") and PropertyDict.
+// The generated expression is in mysql-sql or neo4j-cypher style, that is "xx ASC", "xx.yy DESC".
 func GenerateOrderByExp(source string, dict PropertyDict) string {
 	return orderby.GenerateOrderByExp(source, dict)
 }

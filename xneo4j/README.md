@@ -2,6 +2,7 @@
 
 ## Dependencies
 
++ github.com/Aoi-hosizora/ahlib
 + github.com/neo4j/neo4j-go-driver
 + github.com/sirupsen/logrus
 
@@ -29,6 +30,7 @@
 ### Functions
 
 + `func Collect(result neo4j.Result, err error) ([]neo4j.Record, neo4j.ResultSummary, error)`
++ `func WithEncrypted(encrypted bool) func(*neo4j.Config)`
 + `func GetInteger(data interface{}) int64`
 + `func GetFloat(data interface{}) float64`
 + `func GetString(data interface{}) string`
@@ -49,6 +51,8 @@
 + `func NewPropertyValue(reverse bool, destinations ...string) *PropertyValue`
 + `func GenerateOrderByExp(source string, dict PropertyDict) string`
 + `func NewPool(driver neo4j.Driver, dial DialHandler) *Pool`
++ `func WithLogErr(logErr bool) LoggerOption`
++ `func WithLogCmd(logCmd bool) LoggerOption`
 + `func WithSkip(skip int) LoggerOption`
 + `func WithCounterField(switcher bool) LoggerOption`
 + `func EnableLogger()`
@@ -63,6 +67,7 @@
 + `func (p *Pool) Dial(mode neo4j.AccessMode, bookmarks ...string) (neo4j.Session, error)`
 + `func (p *Pool) DialReadMode(bookmarks ...string) (neo4j.Session, error)`
 + `func (p *Pool) DialWriteMode(bookmarks ...string) (neo4j.Session, error)`
++ `func (p *Pool) Driver() neo4j.Driver`
 + `func (p *Pool) Target() url.URL`
 + `func (p *Pool) VerifyConnectivity() error`
 + `func (p *Pool) Close() error`

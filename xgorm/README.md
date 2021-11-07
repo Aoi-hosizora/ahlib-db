@@ -50,6 +50,7 @@
 + `func NewPropertyValue(reverse bool, destinations ...string) *PropertyValue`
 + `func GenerateOrderByExp(source string, dict PropertyDict) string`
 + `func WithLogInfo(logInfo bool) LoggerOption`
++ `func WithLogSql(logSql bool) LoggerOption`
 + `func WithLogOther(logOther bool) LoggerOption`
 + `func EnableLogger()`
 + `func DisableLogger()`

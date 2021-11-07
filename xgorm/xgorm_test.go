@@ -185,9 +185,10 @@ func testLogger(t *testing.T, giveDialect, giveParam string) {
 		{"silence", true, NewSilenceLogger()},
 		{"logrus", true, NewLogrusLogger(l1)},
 		{"logrus_no_info", true, NewLogrusLogger(l1, WithLogInfo(false))},
+		{"logrus_no_sql", true, NewLogrusLogger(l1, WithLogSql(false))},
 		{"logrus_no_other", true, NewLogrusLogger(l1, WithLogOther(false))},
 		{"logger", true, NewLoggerLogger(l2)},
-		{"logger_no_info_other", true, NewLoggerLogger(l2, WithLogInfo(false), WithLogOther(false))},
+		{"logger_no_xxx", true, NewLoggerLogger(l2, WithLogInfo(false), WithLogSql(false), WithLogOther(false))},
 		{"disable", true, NewLogrusLogger(l1)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

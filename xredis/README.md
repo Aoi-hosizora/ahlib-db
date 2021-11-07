@@ -2,6 +2,7 @@
 
 ## Dependencies
 
++ github.com/Aoi-hosizora/ahlib
 + github.com/go-redis/redis
 + github.com/sirupsen/logrus
 
@@ -29,6 +30,7 @@
 + `func DelAll(ctx context.Context, client *redis.Client, pattern string) (tot int64, err error)`
 + `func DelAllByScan(ctx context.Context, client *redis.Client, pattern string, scanCount int64) (tot int64, err error)`
 + `func WithLogErr(logErr bool) LoggerOption`
++ `func WithLogCmd(logCmd bool) LoggerOption`
 + `func EnableLogger()`
 + `func DisableLogger()`
 + `func NewSilenceLogger() *SilenceLogger`

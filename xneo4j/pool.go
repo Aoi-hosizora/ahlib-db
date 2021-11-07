@@ -73,6 +73,11 @@ func (p *Pool) DialWriteMode(bookmarks ...string) (neo4j.Session, error) {
 	return p.dial(p.driver, neo4j.AccessModeWrite, bookmarks...)
 }
 
+// Driver returned the neo4j.Driver from Pool.
+func (p *Pool) Driver() neo4j.Driver {
+	return p.driver
+}
+
 // Target returned the url.URL that this driver is bootstrapped.
 func (p *Pool) Target() url.URL {
 	return p.driver.Target()

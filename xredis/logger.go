@@ -20,15 +20,23 @@ type ILogger interface {
 // loggerOptions represents some options for logger, set by LoggerOption.
 type loggerOptions struct {
 	logErr bool
+	logCmd bool
 }
 
 // LoggerOption represents an option for logger, created by WithXXX functions.
 type LoggerOption func(*loggerOptions)
 
-// WithLogErr returns a LoggerOption with logErr switcher to do log for error, defaults to true.
+// WithLogErr returns a LoggerOption with logErr switcher to do log for errors, defaults to true.
 func WithLogErr(logErr bool) LoggerOption {
 	return func(o *loggerOptions) {
 		o.logErr = logErr
+	}
+}
+
+// WithLogCmd returns a LoggerOption with logCmd switcher to do log for commands, defaults to true.
+func WithLogCmd(logCmd bool) LoggerOption {
+	return func(o *loggerOptions) {
+		o.logCmd = logCmd
 	}
 }
 
@@ -80,6 +88,7 @@ var _ redis.Hook = &LogrusLogger{}
 func NewLogrusLogger(logger *logrus.Logger, options ...LoggerOption) *LogrusLogger {
 	opt := &loggerOptions{
 		logErr: true,
+		logCmd: true,
 	}
 	for _, op := range options {
 		if op != nil {
@@ -106,6 +115,7 @@ var _ redis.Hook = &LoggerLogger{}
 func NewLoggerLogger(logger logrus.StdLogger, options ...LoggerOption) *LoggerLogger {
 	opt := &loggerOptions{
 		logErr: true,
+		logCmd: true,
 	}
 	for _, op := range options {
 		if op != nil {
@@ -139,11 +149,9 @@ func (l *LogrusLogger) AfterProcess(ctx context.Context, cmd redis.Cmder) error 
 	_, file, line, _ := runtime.Caller(4)
 	source := fmt.Sprintf("%s:%d", file, line)
 	msg, fields, isErr := formatLoggerAndFields(cmd, endTime.Sub(startTime), source)
-	if isErr {
-		if l.options.logErr {
-			l.logger.WithFields(fields).Error(msg)
-		}
-	} else {
+	if isErr && l.options.logErr {
+		l.logger.WithFields(fields).Error(msg)
+	} else if !isErr && l.options.logCmd {
 		l.logger.WithFields(fields).Info(msg)
 	}
 
@@ -174,7 +182,7 @@ func (l *LoggerLogger) AfterProcess(ctx context.Context, cmd redis.Cmder) error 
 	_, file, line, _ := runtime.Caller(4)
 	source := fmt.Sprintf("%s:%d", file, line)
 	msg, _, isErr := formatLoggerAndFields(cmd, endTime.Sub(startTime), source)
-	if !isErr || l.options.logErr {
+	if (isErr && l.options.logErr) || (!isErr && l.options.logCmd) {
 		l.logger.Print(msg)
 	}
 

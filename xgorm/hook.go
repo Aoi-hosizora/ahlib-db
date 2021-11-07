@@ -15,7 +15,7 @@ const (
 	DefaultDeletedAtTimestamp = "1970-01-01 00:00:01"
 )
 
-// GormTime represents a structure of CreatedAt, UpdatedAt, DeletedAt (defaults to "1970-01-01 00:00:01"), is a replacement of gorm.Model.
+// GormTime represents a structure of CreatedAt, UpdatedAt, DeletedAt (defaults to DefaultDeletedAtTimestamp), is a replacement of gorm.Model.
 type GormTime struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time

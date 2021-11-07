@@ -3,6 +3,7 @@ package xneo4j
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/Aoi-hosizora/ahlib/xstring"
 	"github.com/neo4j/neo4j-go-driver/neo4j"
 	"github.com/sirupsen/logrus"
 	"reflect"
@@ -14,12 +15,28 @@ import (
 
 // loggerOptions represents some options for logger, set by LoggerOption.
 type loggerOptions struct {
-	skip         int  // runtime skip
-	counterField bool // write counter fields
+	logErr       bool
+	logCypher    bool
+	skip         int
+	counterField bool
 }
 
 // LoggerOption represents an option for logger, created by WithXXX functions.
 type LoggerOption func(*loggerOptions)
+
+// WithLogErr returns a LoggerOption with logErr switcher to do log for errors, defaults to true.
+func WithLogErr(logErr bool) LoggerOption {
+	return func(o *loggerOptions) {
+		o.logErr = logErr
+	}
+}
+
+// WithLogCypher returns a LoggerOption with logCypher switcher to do log for cyphers, defaults to true.
+func WithLogCypher(logCypher bool) LoggerOption {
+	return func(o *loggerOptions) {
+		o.logCypher = logCypher
+	}
+}
 
 // WithSkip returns a LoggerOption with runtime skip to get runtime information, defaults to 1.
 func WithSkip(skip int) LoggerOption {
@@ -66,8 +83,10 @@ var _ neo4j.Session = &LogrusLogger{}
 // 	session = NewLogrusLogger(session, l) // with default skip 1
 func NewLogrusLogger(session neo4j.Session, logger *logrus.Logger, options ...LoggerOption) *LogrusLogger {
 	opt := &loggerOptions{
-		skip:         1,     // default to 1
-		counterField: false, // default to false
+		logErr:       true,
+		logCypher:    true,
+		skip:         1,
+		counterField: false,
 	}
 	for _, op := range options {
 		if op != nil {
@@ -94,8 +113,10 @@ var _ neo4j.Session = &LoggerLogger{}
 // 	session = NewLoggerLogger(session, l) // with default skip 1
 func NewLoggerLogger(session neo4j.Session, logger logrus.StdLogger, options ...LoggerOption) *LoggerLogger {
 	opt := &loggerOptions{
-		skip:         1,     // default to 1
-		counterField: false, // default to false
+		logErr:       true,
+		logCypher:    true,
+		skip:         1,
+		counterField: false,
 	}
 	for _, op := range options {
 		if op != nil {
@@ -115,9 +136,9 @@ func (l *LogrusLogger) Run(cypher string, params map[string]interface{}, configu
 	_, file, line, _ := runtime.Caller(l.options.skip)
 	source := fmt.Sprintf("%s:%d", file, line)
 	msg, fields, isErr := formatLoggerAndFields(result, err, source, l.options)
-	if isErr {
+	if isErr && l.options.logErr {
 		l.logger.WithFields(fields).Error(msg)
-	} else {
+	} else if !isErr && l.options.logCypher {
 		l.logger.WithFields(fields).Info(msg)
 	}
 
@@ -133,8 +154,10 @@ func (l *LoggerLogger) Run(cypher string, params map[string]interface{}, configu
 
 	_, file, line, _ := runtime.Caller(l.options.skip)
 	source := fmt.Sprintf("%s:%d", file, line)
-	msg, _, _ := formatLoggerAndFields(result, err, source, l.options)
-	l.logger.Print(msg)
+	msg, _, isErr := formatLoggerAndFields(result, err, source, l.options)
+	if (isErr && l.options.logErr) || (!isErr && l.options.logCypher) {
+		l.logger.Print(msg)
+	}
 
 	return result, err
 }
@@ -246,14 +269,14 @@ func render(cypher string, params map[string]interface{}) string {
 			if err != nil {
 				values[k] = "[?]"
 			} else {
-				values[k] = string(bs)
+				values[k] = xstring.FastBtos(bs)
 			}
 		case map[string]interface{}:
 			bs, err := json.Marshal(value)
 			if err != nil {
 				values[k] = "{?}"
 			} else {
-				values[k] = string(bs)
+				values[k] = xstring.FastBtos(bs)
 			}
 
 		// other types

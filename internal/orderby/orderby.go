@@ -41,7 +41,7 @@ func (p *PropertyValue) Reverse() bool {
 	return p.reverse
 }
 
-// GenerateOrderByExp returns a generated orderBy expresion by given source dto order string (split by ",", such as "name desc,age asc") and PropertyDict.
+// GenerateOrderByExp returns a generated orderBy expression by given source dto order string (split by ",", such as "name desc,age asc") and PropertyDict.
 // The generated expression is in mysql-sql and neo4j-cypher style, that is "xx ASC", "xx DESC".
 func GenerateOrderByExp(source string, dict PropertyDict) string {
 	source = strings.TrimSpace(source)

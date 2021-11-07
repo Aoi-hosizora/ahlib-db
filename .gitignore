@@ -11,3 +11,4 @@ coverage.txt
 *.log
 *.sql
 *.sql-journal
+*.cypher

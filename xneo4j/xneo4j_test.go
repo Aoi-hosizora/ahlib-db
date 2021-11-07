@@ -19,7 +19,7 @@ const (
 )
 
 func TestPool(t *testing.T) {
-	driver, err := neo4j.NewDriver(neo4jParam, neo4j.BasicAuth(neo4jUser, neo4jPasswd, ""))
+	driver, err := neo4j.NewDriver(neo4jParam, neo4j.BasicAuth(neo4jUser, neo4jPasswd, ""), WithEncrypted(false))
 	if err != nil {
 		log.Println(err)
 		t.FailNow()
@@ -89,6 +89,8 @@ func TestPool(t *testing.T) {
 	})
 	target := pool.Target()
 	xtesting.Equal(t, target.String(), neo4jParam)
+	target = pool.Driver().Target()
+	xtesting.Equal(t, target.String(), neo4jParam)
 	xtesting.Nil(t, pool.VerifyConnectivity())
 	xtesting.Nil(t, pool.Close())
 	xtesting.NotNil(t, pool.VerifyConnectivity())
@@ -117,7 +119,7 @@ func TestHelper(t *testing.T) {
 		l.SetFormatter(&logrus.TextFormatter{ForceColors: true, FullTimestamp: true, TimestampFormat: time.RFC3339})
 
 		// 1
-		driver, err := neo4j.NewDriver(neo4jWrongParam, neo4j.BasicAuth(neo4jUser, neo4jPasswd, ""))
+		driver, err := neo4j.NewDriver(neo4jWrongParam, neo4j.BasicAuth(neo4jUser, neo4jPasswd, ""), WithEncrypted(false))
 		if err != nil {
 			log.Println(err)
 			t.FailNow()
@@ -134,7 +136,7 @@ func TestHelper(t *testing.T) {
 		_ = driver.Close()
 
 		// 2
-		driver, err = neo4j.NewDriver(neo4jParam, neo4j.BasicAuth(neo4jUser, neo4jPasswd, ""))
+		driver, err = neo4j.NewDriver(neo4jParam, neo4j.BasicAuth(neo4jUser, neo4jPasswd, ""), WithEncrypted(false))
 		if err != nil {
 			log.Println(err)
 			t.FailNow()
@@ -219,16 +221,24 @@ func TestLogger(t *testing.T) {
 	l2 := log.New(os.Stderr, "", log.LstdFlags)
 
 	for _, tc := range []struct {
-		name     string
-		loggerFn interface{}
-		l        interface{}
+		name      string
+		sessionFn func(neo4j.Session) neo4j.Session
 	}{
-		{"logrus", NewLogrusLogger, l1},
-		{"logger", NewLoggerLogger, l2},
-		{"disable", NewLogrusLogger, l1},
+		{"default", func(s neo4j.Session) neo4j.Session { return s }},
+		{"logrus", func(s neo4j.Session) neo4j.Session { return NewLogrusLogger(s, l1) }},
+		{"logrus_no_err", func(s neo4j.Session) neo4j.Session { return NewLogrusLogger(s, l1, WithLogErr(false)) }},
+		{"logrus_no_cypher", func(s neo4j.Session) neo4j.Session { return NewLogrusLogger(s, l1, WithLogCypher(false)) }},
+		{"logrus_field", func(s neo4j.Session) neo4j.Session {
+			return NewLogrusLogger(s, l1, WithSkip(1), WithCounterField(true))
+		}},
+		{"logger", func(s neo4j.Session) neo4j.Session { return NewLoggerLogger(s, l2) }},
+		{"logger_no_xxx", func(s neo4j.Session) neo4j.Session {
+			return NewLoggerLogger(s, l2, WithLogErr(false), WithLogCypher(false))
+		}},
+		{"disable", func(s neo4j.Session) neo4j.Session { return NewLogrusLogger(s, l1) }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			driver, err := neo4j.NewDriver(neo4jParam, neo4j.BasicAuth(neo4jUser, neo4jPasswd, ""))
+			driver, err := neo4j.NewDriver(neo4jParam, neo4j.BasicAuth(neo4jUser, neo4jPasswd, ""), WithEncrypted(false))
 			if err != nil {
 				log.Println(err)
 				t.FailNow()
@@ -238,10 +248,7 @@ func TestLogger(t *testing.T) {
 				log.Println(err)
 				t.FailNow()
 			}
-			newSessionVal := reflect.ValueOf(tc.loggerFn).Call([]reflect.Value{
-				reflect.ValueOf(session), reflect.ValueOf(tc.l), reflect.ValueOf(WithCounterField(true)), reflect.ValueOf(WithSkip(1)),
-			})[0]
-			session = newSessionVal.Interface().(neo4j.Session)
+			session = tc.sessionFn(session)
 			if tc.name != "disable" {
 				EnableLogger()
 			} else {

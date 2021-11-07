@@ -3,6 +3,7 @@ package xgorm
 import (
 	"database/sql/driver"
 	"fmt"
+	"github.com/Aoi-hosizora/ahlib/xstring"
 	"github.com/sirupsen/logrus"
 	"reflect"
 	"regexp"
@@ -19,6 +20,7 @@ type ILogger interface {
 // loggerOptions represents some options for logger, set by LoggerOption.
 type loggerOptions struct {
 	logInfo  bool
+	logSql   bool
 	logOther bool
 }
 
@@ -29,6 +31,13 @@ type LoggerOption func(*loggerOptions)
 func WithLogInfo(logInfo bool) LoggerOption {
 	return func(o *loggerOptions) {
 		o.logInfo = logInfo
+	}
+}
+
+// WithLogSql returns a LoggerOption with logSql switcher to do log for [SQL], defaults to true.
+func WithLogSql(logSql bool) LoggerOption {
+	return func(o *loggerOptions) {
+		o.logSql = logSql
 	}
 }
 
@@ -80,6 +89,7 @@ type LogrusLogger struct {
 func NewLogrusLogger(logger *logrus.Logger, options ...LoggerOption) *LogrusLogger {
 	opt := &loggerOptions{
 		logInfo:  true,
+		logSql:   true,
 		logOther: true,
 	}
 	for _, op := range options {
@@ -105,6 +115,7 @@ type LoggerLogger struct {
 func NewLoggerLogger(logger logrus.StdLogger, options ...LoggerOption) *LoggerLogger {
 	opt := &loggerOptions{
 		logInfo:  true,
+		logSql:   true,
 		logOther: true,
 	}
 	for _, op := range options {
@@ -126,7 +137,7 @@ func (g *LogrusLogger) Print(v ...interface{}) {
 
 	// info & sql & ...
 	msg, fields := formatLoggerAndFields(v, g.options)
-	if msg != "" && len(fields) != 0 {
+	if msg != "" {
 		g.logger.WithFields(fields).Info(msg)
 	}
 }
@@ -180,6 +191,9 @@ func formatLoggerAndFields(v []interface{}, options *loggerOptions) (string, log
 		msg = fmt.Sprintf("[Gorm] [%v] %v", v[0], s)
 	} else {
 		// sql
+		if !options.logSql {
+			return "", nil
+		}
 		source := v[1]
 		duration := v[2].(time.Duration)
 		sql := render(v[3].(string), v[4].([]interface{}))
@@ -234,7 +248,7 @@ func render(sql string, params []interface{}) string {
 				values = append(values, fmt.Sprintf("'%v'", value.Format("2006-01-02 15:04:05")))
 			}
 		case []byte:
-			if str := string(value); isPrintable(str) {
+			if str := xstring.FastBtos(value); isPrintable(str) {
 				values = append(values, fmt.Sprintf("'%v'", str))
 			} else {
 				values = append(values, "'<binary>'")

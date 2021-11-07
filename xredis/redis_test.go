@@ -126,8 +126,9 @@ func TestLogger(t *testing.T) {
 		{"default", nil},
 		{"logrus", NewLogrusLogger(l1)},
 		{"logrus_no_err", NewLogrusLogger(l1, WithLogErr(false))},
+		{"logrus_no_cmd", NewLogrusLogger(l1, WithLogCmd(false))},
 		{"logger", NewLoggerLogger(l2)},
-		{"logger_no_err", NewLoggerLogger(l2, WithLogErr(false))},
+		{"logger_no_xxx", NewLoggerLogger(l2, WithLogErr(false), WithLogCmd(false))},
 		{"disable", NewLogrusLogger(l1)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -150,6 +151,8 @@ func TestLogger(t *testing.T) {
 				DisableLogger()
 			}
 
+			client.Do(context.Background(), "XXX")
+			client.Do(context.Background(), "SET", "X", "X", "X", "X")
 			client.Get(context.Background(), "test")               // String err
 			client.Set(context.Background(), "test", "test", 0)    // Status
 			client.Get(context.Background(), "test")               // String

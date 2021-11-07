@@ -31,4 +31,4 @@
 + `github.com/lib/pq v1.1.1`
 + `github.com/go-redis/redis/v8 v8.4.11`
 + `github.com/neo4j/neo4j-go-driver v1.8.3`
-+ `github.com/sirupsen/logrus v1.7.0`
++ `github.com/sirupsen/logrus v1.8.1`
