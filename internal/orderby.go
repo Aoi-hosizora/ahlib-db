@@ -1,4 +1,4 @@
-package orderby
+package internal
 
 import (
 	"strings"

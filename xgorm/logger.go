@@ -66,7 +66,7 @@ type SilenceLogger struct{}
 
 // NewSilenceLogger creates a new SilenceLogger.
 // Example:
-// 	db, err := gorm.Open("mysql", dsl)
+// 	db, err := gorm.Open("mysql", dsn)
 // 	db.LogMode(true) // both true and false are ok
 // 	db.SetLogger(xgorm.NewSilenceLogger())
 func NewSilenceLogger() *SilenceLogger {
@@ -81,7 +81,7 @@ type LogrusLogger struct {
 
 // NewLogrusLogger creates a new LogrusLogger using given logrus.Logger and LoggerOption-s.
 // Example:
-// 	db, err := gorm.Open("mysql", dsl)
+// 	db, err := gorm.Open("mysql", dsn)
 // 	db.LogMode(true) // must be true
 // 	l := logrus.New()
 // 	l.SetFormatter(&logrus.TextFormatter{})
@@ -108,7 +108,7 @@ type LoggerLogger struct {
 
 // NewLoggerLogger creates a new LoggerLogger using given logrus.StdLogger and LoggerOption-s.
 // Example:
-// 	db, err := gorm.Open("mysql", dsl)
+// 	db, err := gorm.Open("mysql", dsn)
 // 	db.LogMode(true) // must be true
 // 	l := log.New(os.Stderr, "", log.LstdFlags)
 // 	db.SetLogger(xgorm.NewLoggerLogger(l))

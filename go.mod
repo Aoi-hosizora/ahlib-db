@@ -1,6 +1,6 @@
 module github.com/Aoi-hosizora/ahlib-db
 
-go 1.13
+go 1.15
 
 require (
 	github.com/Aoi-hosizora/ahlib v1.5.0
@@ -12,3 +12,5 @@ require (
 	github.com/neo4j/neo4j-go-driver v1.8.3
 	github.com/sirupsen/logrus v1.8.1
 )
+
+replace github.com/Aoi-hosizora/ahlib => ../ahlib

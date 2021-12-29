@@ -1,7 +1,7 @@
 package xneo4j
 
 import (
-	"github.com/Aoi-hosizora/ahlib-db/internal/orderby"
+	"github.com/Aoi-hosizora/ahlib-db/internal"
 	"github.com/neo4j/neo4j-go-driver/neo4j"
 	"time"
 )
@@ -135,18 +135,18 @@ func GetDuration(data interface{}) neo4j.Duration {
 }
 
 // PropertyValue represents a PO entity's property mapping rule.
-type PropertyValue = orderby.PropertyValue
+type PropertyValue = internal.PropertyValue
 
 // PropertyDict represents a DTO-PO PropertyValue dictionary, used in GenerateOrderByExp.
-type PropertyDict = orderby.PropertyDict
+type PropertyDict = internal.PropertyDict
 
 // NewPropertyValue creates a PropertyValue by given reverse and destinations.
 func NewPropertyValue(reverse bool, destinations ...string) *PropertyValue {
-	return orderby.NewPropertyValue(reverse, destinations...)
+	return internal.NewPropertyValue(reverse, destinations...)
 }
 
 // GenerateOrderByExp returns a generated orderBy expression by given source dto order string (split by ",", such as "name desc, age asc") and PropertyDict.
 // The generated expression is in mysql-sql or neo4j-cypher style, that is "xx ASC", "xx.yy DESC".
 func GenerateOrderByExp(source string, dict PropertyDict) string {
-	return orderby.GenerateOrderByExp(source, dict)
+	return internal.GenerateOrderByExp(source, dict)
 }

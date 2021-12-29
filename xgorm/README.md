@@ -30,6 +30,9 @@
 ### Constants
 
 + `const DefaultDeletedAtTimestamp string`
++ `const MySQL string`
++ `const SQLite string`
++ `const Postgres string`
 + `const MySQLDuplicateEntryErrno int`
 + `const SQLiteUniqueConstraintErrno int`
 + `const PostgreSQLUniqueViolationErrno string`
@@ -37,6 +40,8 @@
 ### Functions
 
 + `func HookDeletedAt(db *gorm.DB, deletedAtTimestamp string) *gorm.DB`
++ `func MySQLDefaultDsn(username, password, address, database string) string`
++ `func PostgresDefaultDsn(username, password, host string, port int, database string) string`
 + `func IsMySQL(db *gorm.DB) bool`
 + `func IsSQLite(db *gorm.DB) bool`
 + `func IsPostgreSQL(db *gorm.DB) bool`

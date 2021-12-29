@@ -12,7 +12,7 @@ func TestHook(t *testing.T) {
 		giveDialect string
 		giveParam   string
 	}{
-		{"mysql", mysqlDsl},
+		{MySQL, mysqlDsn},
 	} {
 		t.Run(tc.giveDialect, func(t *testing.T) {
 			testHook(t, tc.giveDialect, tc.giveParam)
@@ -25,7 +25,7 @@ func TestHelper(t *testing.T) {
 		giveDialect string
 		giveParam   string
 	}{
-		{"mysql", mysqlDsl},
+		{MySQL, mysqlDsn},
 	} {
 		t.Run(tc.giveDialect, func(t *testing.T) {
 			testHelper(t, tc.giveDialect, tc.giveParam)
@@ -38,7 +38,7 @@ func TestLogger(t *testing.T) {
 		giveDialect string
 		giveParam   string
 	}{
-		{"mysql", mysqlDsl},
+		{MySQL, mysqlDsn},
 	} {
 		t.Run(tc.giveDialect, func(t *testing.T) {
 			testLogger(t, tc.giveDialect, tc.giveParam)

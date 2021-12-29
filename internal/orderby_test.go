@@ -1,4 +1,4 @@
-package orderby
+package internal
 
 import (
 	"github.com/Aoi-hosizora/ahlib/xtesting"

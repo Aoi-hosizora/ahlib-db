@@ -1,3 +1,4 @@
+//go:build cgo
 // +build cgo
 
 package xgorm
@@ -13,8 +14,8 @@ func TestHook(t *testing.T) {
 		giveDialect string
 		giveParam   string
 	}{
-		{"mysql", mysqlDsl},
-		{"sqlite3", sqliteFile},
+		{MySQL, mysqlDsn},
+		{SQLite, sqliteFile},
 	} {
 		t.Run(tc.giveDialect, func(t *testing.T) {
 			testHook(t, tc.giveDialect, tc.giveParam)
@@ -27,8 +28,8 @@ func TestHelper(t *testing.T) {
 		giveDialect string
 		giveParam   string
 	}{
-		{"mysql", mysqlDsl},
-		{"sqlite3", sqliteFile},
+		{MySQL, mysqlDsn},
+		{SQLite, sqliteFile},
 	} {
 		t.Run(tc.giveDialect, func(t *testing.T) {
 			testHelper(t, tc.giveDialect, tc.giveParam)
@@ -41,8 +42,8 @@ func TestLogger(t *testing.T) {
 		giveDialect string
 		giveParam   string
 	}{
-		{"mysql", mysqlDsl},
-		{"sqlite3", sqliteFile},
+		{MySQL, mysqlDsn},
+		{SQLite, sqliteFile},
 	} {
 		t.Run(tc.giveDialect, func(t *testing.T) {
 			testLogger(t, tc.giveDialect, tc.giveParam)

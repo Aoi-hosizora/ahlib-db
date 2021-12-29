@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	mysqlDsl   = "root:123@tcp(localhost:3306)/db_test?charset=utf8&parseTime=True&loc=Local"
+	mysqlDsn   = "root:123@tcp(localhost:3306)/db_test?charset=utf8&parseTime=True&loc=Local"
 	sqliteFile = "test.sql"
 )
 
