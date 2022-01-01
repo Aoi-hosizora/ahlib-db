@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-// loggerOptions represents some options for logger, set by LoggerOption.
+// loggerOptions is a type of LogrusLogger's option and LoggerLogger's option, each field can be set by LoggerOption function type.
 type loggerOptions struct {
 	logErr       bool
 	logCypher    bool
@@ -21,46 +21,46 @@ type loggerOptions struct {
 	counterField bool
 }
 
-// LoggerOption represents an option for logger, created by WithXXX functions.
+// LoggerOption represents an option type for LogrusLogger's option and LoggerLogger's option, can be created by WithXXX functions.
 type LoggerOption func(*loggerOptions)
 
-// WithLogErr returns a LoggerOption with logErr switcher to do log for errors, defaults to true.
+// WithLogErr creates a LoggerOption to decide whether to do log for errors or not, defaults to true.
 func WithLogErr(logErr bool) LoggerOption {
 	return func(o *loggerOptions) {
 		o.logErr = logErr
 	}
 }
 
-// WithLogCypher returns a LoggerOption with logCypher switcher to do log for cyphers, defaults to true.
+// WithLogCypher creates a LoggerOption to decide whether to do log for cyphers or not, defaults to true.
 func WithLogCypher(logCypher bool) LoggerOption {
 	return func(o *loggerOptions) {
 		o.logCypher = logCypher
 	}
 }
 
-// WithSkip returns a LoggerOption with runtime skip to get runtime information, defaults to 1.
+// WithSkip creates a LoggerOption to specific runtime skip for getting runtime information, defaults to 1.
 func WithSkip(skip int) LoggerOption {
 	return func(o *loggerOptions) {
 		o.skip = skip
 	}
 }
 
-// WithCounterField returns a LoggerOption with counter fields switcher, defaults to false.
-func WithCounterField(switcher bool) LoggerOption {
+// WithCounterField creates a LoggerOption to decide whether to do log for counter fields or not, defaults to false.
+func WithCounterField(flag bool) LoggerOption {
 	return func(o *loggerOptions) {
-		o.counterField = switcher
+		o.counterField = flag
 	}
 }
 
-// _enable is a global switcher to control xneo4j logger behavior.
+// _enable is a global flag to control behaviors of LogrusLogger and LoggerLogger.
 var _enable = true
 
-// EnableLogger enables xneo4j logger to do any log.
+// EnableLogger enables LogrusLogger and LoggerLogger to do any log.
 func EnableLogger() {
 	_enable = true
 }
 
-// DisableLogger disables xneo4j logger to do any log.
+// DisableLogger disables LogrusLogger and LoggerLogger.
 func DisableLogger() {
 	_enable = false
 }
@@ -72,9 +72,8 @@ type LogrusLogger struct {
 	options *loggerOptions
 }
 
-var _ neo4j.Session = &LogrusLogger{}
-
 // NewLogrusLogger creates a new LogrusLogger using given logrus.Logger and LoggerOption-s.
+//
 // Example:
 // 	driver, err := neo4j.NewDriver(target, auth)
 // 	session, err := driver.Session(neo4j.AccessModeRead)
@@ -103,9 +102,8 @@ type LoggerLogger struct {
 	options *loggerOptions
 }
 
-var _ neo4j.Session = &LoggerLogger{}
-
 // NewLoggerLogger creates a new LoggerLogger using given log.Logger and LoggerOption-s.
+//
 // Example:
 // 	driver, err := neo4j.NewDriver(target, auth)
 // 	session, err := driver.Session(neo4j.AccessModeRead)
@@ -126,7 +124,11 @@ func NewLoggerLogger(session neo4j.Session, logger logrus.StdLogger, options ...
 	return &LoggerLogger{Session: session, logger: logger, options: opt}
 }
 
-// Run executes given cypher and params, and logs to logrus.Logger.
+// =======
+// methods
+// =======
+
+// Run implements neo4j.Session interface, it executes given cypher and params, and logs to logrus.Logger.
 func (l *LogrusLogger) Run(cypher string, params map[string]interface{}, configurers ...func(*neo4j.TransactionConfig)) (neo4j.Result, error) {
 	result, err := l.Session.Run(cypher, params, configurers...)
 	if !_enable {
@@ -145,7 +147,7 @@ func (l *LogrusLogger) Run(cypher string, params map[string]interface{}, configu
 	return result, err
 }
 
-// Run executes given cypher and params, and logs to logrus.StdLogger.
+// Run implements neo4j.Session interface, it executes given cypher and params, and logs to logrus.StdLogger.
 func (l *LoggerLogger) Run(cypher string, params map[string]interface{}, configurers ...func(*neo4j.TransactionConfig)) (neo4j.Result, error) {
 	result, err := l.Session.Run(cypher, params, configurers...)
 	if !_enable {
@@ -162,7 +164,12 @@ func (l *LoggerLogger) Run(cypher string, params map[string]interface{}, configu
 	return result, err
 }
 
+// ========
+// internal
+// ========
+
 // formatLoggerAndFields formats given neo4j.Result, error, source and loggerOptions to logger string, logrus.Fields and isError flag.
+//
 // Logs like:
 // 	[Neo4j] Connection error: dial tcp [::1]:7687: connectex: No connection could be made because the target machine actively refused it. | F:/Projects/ahlib-db/xneo4j/xneo4j_test.go:97
 // 	[Neo4j] Server error: [Neo.ClientError.Statement.SyntaxError] Invalid input 'n' (line 1, column 26 (offset: 25)) | F:/Projects/ahlib-db/xneo4j/xneo4j_test.go:97

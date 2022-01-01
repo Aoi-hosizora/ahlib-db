@@ -54,7 +54,7 @@
 + `func WithLogErr(logErr bool) LoggerOption`
 + `func WithLogCmd(logCmd bool) LoggerOption`
 + `func WithSkip(skip int) LoggerOption`
-+ `func WithCounterField(switcher bool) LoggerOption`
++ `func WithCounterField(flag bool) LoggerOption`
 + `func EnableLogger()`
 + `func DisableLogger()`
 + `func NewLogrusLogger(session neo4j.Session, logger *logrus.Logger, options ...LoggerOption) *LogrusLogger`

@@ -1,24 +1,17 @@
-// +build cgo
+//go:build !cgo
+// +build !cgo
 
 package xgorm
 
 import (
 	"github.com/Aoi-hosizora/ahlib/xstatus"
 	"github.com/jinzhu/gorm"
-	"github.com/mattn/go-sqlite3"
 )
 
-// IsSQLiteUniqueConstraintError checks if err is SQLite's ErrConstraintUnique error.
-func IsSQLiteUniqueConstraintError(err error) bool {
-	sqliteErr, ok := err.(sqlite3.Error)
-	return ok && sqliteErr.ExtendedCode == SQLiteUniqueConstraintErrno
-}
-
-// CreateErr checks gorm.DB create result, will only return xstatus.DbExisted, xstatus.DbFailed and xstatus.DbSuccess.
+// CreateErr checks gorm.DB after create operated, will only return xstatus.DbSuccess, xstatus.DbExisted and xstatus.DbFailed.
 func CreateErr(rdb *gorm.DB) (xstatus.DbStatus, error) {
 	switch {
 	case IsMySQL(rdb) && IsMySQLDuplicateEntryError(rdb.Error),
-		IsSQLite(rdb) && IsSQLiteUniqueConstraintError(rdb.Error),
 		IsPostgreSQL(rdb) && IsPostgreSQLUniqueViolationError(rdb.Error):
 		return xstatus.DbExisted, rdb.Error // duplicate
 	case rdb.Error != nil:
@@ -27,11 +20,10 @@ func CreateErr(rdb *gorm.DB) (xstatus.DbStatus, error) {
 	return xstatus.DbSuccess, nil
 }
 
-// UpdateErr checks gorm.DB update result, will only return xstatus.DbExisted, xstatus.DbFailed, xstatus.DbNotFound and xstatus.DbSuccess.
+// UpdateErr checks gorm.DB after update operated, will only return xstatus.DbSuccess, xstatus.DbNotFound, xstatus.DbExisted and xstatus.DbFailed.
 func UpdateErr(rdb *gorm.DB) (xstatus.DbStatus, error) {
 	switch {
 	case IsMySQL(rdb) && IsMySQLDuplicateEntryError(rdb.Error),
-		IsSQLite(rdb) && IsSQLiteUniqueConstraintError(rdb.Error),
 		IsPostgreSQL(rdb) && IsPostgreSQLUniqueViolationError(rdb.Error):
 		return xstatus.DbExisted, rdb.Error // duplicate
 	case rdb.Error != nil:

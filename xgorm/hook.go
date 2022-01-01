@@ -7,13 +7,8 @@ import (
 	"time"
 )
 
-const (
-	// deletedAtFieldName represents the struct field name of "DeletedAt".
-	deletedAtFieldName = "DeletedAt"
-
-	// DefaultDeletedAtTimestamp represents the default value of GormTime.DeletedAt.
-	DefaultDeletedAtTimestamp = "1970-01-01 00:00:01"
-)
+// DefaultDeletedAtTimestamp represents the default value in `gorm` tag of GormTime.DeletedAt.
+const DefaultDeletedAtTimestamp = "1970-01-01 00:00:01"
 
 // GormTime represents a structure of CreatedAt, UpdatedAt, DeletedAt (defaults to DefaultDeletedAtTimestamp), is a replacement of gorm.Model.
 type GormTime struct {
@@ -28,7 +23,8 @@ type GormTime2 struct {
 	UpdatedAt time.Time
 }
 
-// HookDeletedAt hooks gorm.DB to replace the soft-delete callback (including query, row_query, update, delete) using the new deletedAt timestamp.
+// HookDeletedAt hooks gorm.DB to replace the soft-delete callback (including query, row_query, update, delete), using the new deletedAt timestamp,
+// such as DefaultDeletedAtTimestamp.
 func HookDeletedAt(db *gorm.DB, deletedAtTimestamp string) *gorm.DB {
 	// query
 	db.Callback().Query().
@@ -52,9 +48,9 @@ func HookDeletedAt(db *gorm.DB, deletedAtTimestamp string) *gorm.DB {
 	return db
 }
 
-// deletedAtQueryUpdateCallback is a callback for gorm:query, gorm:row_query, gorm:update used in HookDeletedAt.
-//
-// Reference: https://qiita.com/touyu/items/f1ac43b186cd6b26b8c7.
+const deletedAtFieldName = "DeletedAt"
+
+// deletedAtQueryUpdateCallback is a callback for query, row_query and update, used in HookDeletedAt, referred from https://qiita.com/touyu/items/f1ac43b186cd6b26b8c7.
 func deletedAtQueryUpdateCallback(deletedAtTimestamp string) func(scope *gorm.Scope) {
 	return func(scope *gorm.Scope) {
 		var (
@@ -78,9 +74,7 @@ func addExtraSpaceIfNotBlank(s string) string {
 	return ""
 }
 
-// deletedAtDeleteCallback is a callback for gorm:delete used in HookDeletedAt.
-//
-// Reference: https://github.com/jinzhu/gorm/blob/master/callback_delete.go.
+// deletedAtDeleteCallback is a callback for gorm:delete used in HookDeletedAt, referred from https://github.com/jinzhu/gorm/blob/master/callback_delete.go.
 func deletedAtDeleteCallback(deletedAtTimestamp string) func(scope *gorm.Scope) {
 	return func(scope *gorm.Scope) {
 		var extraOption string

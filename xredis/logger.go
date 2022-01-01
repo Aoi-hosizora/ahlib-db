@@ -12,51 +12,52 @@ import (
 	"time"
 )
 
-// ILogger represents neo4j's internal logger interface.
-type ILogger interface {
-	Printf(ctx context.Context, format string, v ...interface{})
-}
-
-// loggerOptions represents some options for logger, set by LoggerOption.
+// loggerOptions is a type of LogrusLogger's option and LoggerLogger's option, each field can be set by LoggerOption function type.
 type loggerOptions struct {
 	logErr bool
 	logCmd bool
 }
 
-// LoggerOption represents an option for logger, created by WithXXX functions.
+// LoggerOption represents an option type for LogrusLogger's option and LoggerLogger's option, can be created by WithXXX functions.
 type LoggerOption func(*loggerOptions)
 
-// WithLogErr returns a LoggerOption with logErr switcher to do log for errors, defaults to true.
+// WithLogErr creates a LoggerOption to decide whether to do log for errors or not, defaults to true.
 func WithLogErr(logErr bool) LoggerOption {
 	return func(o *loggerOptions) {
 		o.logErr = logErr
 	}
 }
 
-// WithLogCmd returns a LoggerOption with logCmd switcher to do log for commands, defaults to true.
+// WithLogCmd creates a LoggerOption to decide whether to do log for redis commands or not, defaults to true.
 func WithLogCmd(logCmd bool) LoggerOption {
 	return func(o *loggerOptions) {
 		o.logCmd = logCmd
 	}
 }
 
-// _enable is a global switcher to control xredis logger behavior.
+// _enable is a global flag to control behaviors of LogrusLogger and LoggerLogger.
 var _enable = true
 
-// EnableLogger enables xredis logger to do any log.
+// EnableLogger enables LogrusLogger and LoggerLogger to do any log.
 func EnableLogger() {
 	_enable = true
 }
 
-// DisableLogger disables xredis logger to do any log.
+// DisableLogger disables LogrusLogger and LoggerLogger.
 func DisableLogger() {
 	_enable = false
 }
 
-// SilenceLogger represents a redis's logger, used to hide go-redis's info logger.
+// ILogger abstracts redis's internal logger to an interface.
+type ILogger interface {
+	Printf(ctx context.Context, format string, v ...interface{})
+}
+
+// SilenceLogger represents a redis's logger, used to hide all logs.
 type SilenceLogger struct{}
 
 // NewSilenceLogger creates a new SilenceLogger.
+//
 // Example:
 // 	client := redis.NewClient(options)
 // 	redis.SetLogger(xredis.NewSilenceLogger())
@@ -64,21 +65,18 @@ func NewSilenceLogger() *SilenceLogger {
 	return &SilenceLogger{}
 }
 
-// Printf does nothing.
+// Printf implements redis.Logging interface, it does nothing.
 func (l *SilenceLogger) Printf(context.Context, string, ...interface{}) {}
-
-// &_startTimeKey is the key for process start time
-var _startTimeKey int
 
 // LogrusLogger represents a redis's logger (as redis.Hook), used to log redis command executing message to logrus.Logger.
 type LogrusLogger struct {
+	redis.Hook
 	logger  *logrus.Logger
 	options *loggerOptions
 }
 
-var _ redis.Hook = &LogrusLogger{}
-
 // NewLogrusLogger creates a new LogrusLogger using given logrus.Logger and LoggerOption-s.
+//
 // Example:
 // 	client := redis.NewClient(options)
 // 	redis.SetLogger(NewSilenceLogger())
@@ -86,13 +84,10 @@ var _ redis.Hook = &LogrusLogger{}
 // 	l.SetFormatter(&logrus.TextFormatter{})
 // 	client.AddHook(xredis.NewLogrusLogger(l))
 func NewLogrusLogger(logger *logrus.Logger, options ...LoggerOption) *LogrusLogger {
-	opt := &loggerOptions{
-		logErr: true,
-		logCmd: true,
-	}
-	for _, op := range options {
-		if op != nil {
-			op(opt)
+	opt := &loggerOptions{logErr: true, logCmd: true}
+	for _, o := range options {
+		if o != nil {
+			o(opt)
 		}
 	}
 	return &LogrusLogger{logger: logger, options: opt}
@@ -100,45 +95,41 @@ func NewLogrusLogger(logger *logrus.Logger, options ...LoggerOption) *LogrusLogg
 
 // LoggerLogger represents a redis's logger (as redis.Hook), used to log redis command executing message to logrus.StdLogger.
 type LoggerLogger struct {
+	redis.Hook
 	logger  logrus.StdLogger
 	options *loggerOptions
 }
 
-var _ redis.Hook = &LoggerLogger{}
-
 // NewLoggerLogger creates a new LoggerLogger using given logrus.StdLogger and LoggerOption-s.
+//
 // Example:
 // 	client := redis.NewClient(options)
 // 	redis.SetLogger(NewSilenceLogger())
 // 	l := log.New(os.Stderr, "", log.LstdFlags)
 // 	client.AddHook(xredis.NewLoggerLogger(l))
 func NewLoggerLogger(logger logrus.StdLogger, options ...LoggerOption) *LoggerLogger {
-	opt := &loggerOptions{
-		logErr: true,
-		logCmd: true,
-	}
-	for _, op := range options {
-		if op != nil {
-			op(opt)
+	opt := &loggerOptions{logErr: true, logCmd: true}
+	for _, o := range options {
+		if o != nil {
+			o(opt)
 		}
 	}
 	return &LoggerLogger{logger: logger, options: opt}
 }
 
-func (l *LogrusLogger) BeforeProcessPipeline(ctx context.Context, _ []redis.Cmder) (context.Context, error) {
-	return ctx, nil
-}
+// =======
+// methods
+// =======
 
-func (l *LogrusLogger) AfterProcessPipeline(context.Context, []redis.Cmder) error {
-	return nil
-}
+// &_startTimeKey is the key for process start time
+var _startTimeKey int
 
-// BeforeProcess saves start time to context, used in AfterProcess.
+// BeforeProcess implements redis.Hook interface, it saves start time to context, which is used in AfterProcess.
 func (l *LogrusLogger) BeforeProcess(ctx context.Context, _ redis.Cmder) (context.Context, error) {
 	return context.WithValue(ctx, &_startTimeKey, time.Now()), nil
 }
 
-// AfterProcess logs to logrus.Logger.
+// AfterProcess implements redis.Hook interface, it logs to logrus.Logger.
 func (l *LogrusLogger) AfterProcess(ctx context.Context, cmd redis.Cmder) error {
 	endTime := time.Now()
 	startTime, ok := ctx.Value(&_startTimeKey).(time.Time)
@@ -158,20 +149,12 @@ func (l *LogrusLogger) AfterProcess(ctx context.Context, cmd redis.Cmder) error 
 	return nil
 }
 
-func (l *LoggerLogger) BeforeProcessPipeline(ctx context.Context, _ []redis.Cmder) (context.Context, error) {
-	return ctx, nil
-}
-
-func (l *LoggerLogger) AfterProcessPipeline(context.Context, []redis.Cmder) error {
-	return nil
-}
-
-// BeforeProcess saves start time to context, used in AfterProcess.
+// BeforeProcess implements redis.Hook interface, it saves start time to context, which is used in AfterProcess.
 func (l *LoggerLogger) BeforeProcess(ctx context.Context, _ redis.Cmder) (context.Context, error) {
 	return context.WithValue(ctx, &_startTimeKey, time.Now()), nil
 }
 
-// AfterProcess logs to logrus.StdLogger.
+// AfterProcess implements redis.Hook interface, it logs to logrus.StdLogger.
 func (l *LoggerLogger) AfterProcess(ctx context.Context, cmd redis.Cmder) error {
 	endTime := time.Now()
 	startTime, ok := ctx.Value(&_startTimeKey).(time.Time)
@@ -189,7 +172,12 @@ func (l *LoggerLogger) AfterProcess(ctx context.Context, cmd redis.Cmder) error 
 	return nil
 }
 
+// ========
+// internal
+// ========
+
 // formatLoggerAndFields formats redis.Cmder and time.Duration to logger string, logrus.Fields and isError flag.
+//
 // Logs like:
 // 	[Redis] ERR invalid password | SET test_a test_aaa | F:/Projects/ahlib-db/xredis/redis_test.go:41
 // 	[Redis]    Nil |   305.9909ms | GET test | F:/Projects/ahlib-db/xredis/redis_test.go:126

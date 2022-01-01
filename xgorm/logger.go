@@ -12,66 +12,70 @@ import (
 	"unicode"
 )
 
-// ILogger represents gorm's internal logger interface.
-type ILogger interface {
-	Print(v ...interface{})
-}
-
-// loggerOptions represents some options for logger, set by LoggerOption.
+// loggerOptions is a type of LogrusLogger's option and LoggerLogger's option, each field can be set by LoggerOption function type.
 type loggerOptions struct {
 	logInfo  bool
 	logSql   bool
 	logOther bool
 }
 
-// LoggerOption represents an option for logger, created by WithXXX functions.
+// LoggerOption represents an option type for LogrusLogger's option and LoggerLogger's option, can be created by WithXXX functions.
 type LoggerOption func(*loggerOptions)
 
-// WithLogInfo returns a LoggerOption with logInfo switcher to do log for [INFO], defaults to true.
+// WithLogInfo creates a LoggerOption to decide whether to do log for [INFO] or not, defaults to true.
 func WithLogInfo(logInfo bool) LoggerOption {
 	return func(o *loggerOptions) {
 		o.logInfo = logInfo
 	}
 }
 
-// WithLogSql returns a LoggerOption with logSql switcher to do log for [SQL], defaults to true.
+// WithLogSql creates a LoggerOption to decide whether to do log for [SQL] or not, defaults to true.
 func WithLogSql(logSql bool) LoggerOption {
 	return func(o *loggerOptions) {
 		o.logSql = logSql
 	}
 }
 
-// WithLogOther returns a LoggerOption with logOther switcher to do log for other type, such as [LOG], defaults to true.
+// WithLogOther creates a LoggerOption to decide whether to do log for other type (such as [LOG]) or not, defaults to true.
 func WithLogOther(logOther bool) LoggerOption {
 	return func(o *loggerOptions) {
 		o.logOther = logOther
 	}
 }
 
-// _enable is a global switcher to control xgorm logger behavior.
+// _enable is a global flag to control behaviors of LogrusLogger and LoggerLogger.
 var _enable = true
 
-// EnableLogger enables xgorm logger to do any log.
+// EnableLogger enables LogrusLogger and LoggerLogger to do any log.
 func EnableLogger() {
 	_enable = true
 }
 
-// DisableLogger disables xgorm logger to do any log.
+// DisableLogger disables LogrusLogger and LoggerLogger.
 func DisableLogger() {
 	_enable = false
 }
 
-// SilenceLogger represents a gorm's logger, used to hide "SQL" and "INFO" logs. Note that `gorm.DB.LogMode(false)` will only hide "SQL" message.
+// ILogger abstracts gorm's internal logger to an interface.
+type ILogger interface {
+	Print(v ...interface{})
+}
+
+// SilenceLogger represents a gorm's logger, used to hide all logs, such as "SQL" and "INFO". Note that `gorm.DB.LogMode(false)` will only hide "SQL" message.
 type SilenceLogger struct{}
 
 // NewSilenceLogger creates a new SilenceLogger.
+//
 // Example:
 // 	db, err := gorm.Open("mysql", dsn)
-// 	db.LogMode(true) // both true and false are ok
+// 	db.LogMode(false) // both true and false are ok
 // 	db.SetLogger(xgorm.NewSilenceLogger())
 func NewSilenceLogger() *SilenceLogger {
 	return &SilenceLogger{}
 }
+
+// Print implements gorm.logger interface, it does nothing for log.
+func (g *SilenceLogger) Print(...interface{}) {}
 
 // LogrusLogger represents a gorm's logger, used to log "SQL" and "INFO" message to logrus.Logger.
 type LogrusLogger struct {
@@ -80,6 +84,7 @@ type LogrusLogger struct {
 }
 
 // NewLogrusLogger creates a new LogrusLogger using given logrus.Logger and LoggerOption-s.
+//
 // Example:
 // 	db, err := gorm.Open("mysql", dsn)
 // 	db.LogMode(true) // must be true
@@ -87,14 +92,10 @@ type LogrusLogger struct {
 // 	l.SetFormatter(&logrus.TextFormatter{})
 // 	db.SetLogger(xgorm.NewLogrusLogger(l))
 func NewLogrusLogger(logger *logrus.Logger, options ...LoggerOption) *LogrusLogger {
-	opt := &loggerOptions{
-		logInfo:  true,
-		logSql:   true,
-		logOther: true,
-	}
-	for _, op := range options {
-		if op != nil {
-			op(opt)
+	opt := &loggerOptions{logInfo: true, logSql: true, logOther: true}
+	for _, o := range options {
+		if o != nil {
+			o(opt)
 		}
 	}
 	return &LogrusLogger{logger: logger, options: opt}
@@ -107,29 +108,27 @@ type LoggerLogger struct {
 }
 
 // NewLoggerLogger creates a new LoggerLogger using given logrus.StdLogger and LoggerOption-s.
+//
 // Example:
 // 	db, err := gorm.Open("mysql", dsn)
 // 	db.LogMode(true) // must be true
 // 	l := log.New(os.Stderr, "", log.LstdFlags)
 // 	db.SetLogger(xgorm.NewLoggerLogger(l))
 func NewLoggerLogger(logger logrus.StdLogger, options ...LoggerOption) *LoggerLogger {
-	opt := &loggerOptions{
-		logInfo:  true,
-		logSql:   true,
-		logOther: true,
-	}
-	for _, op := range options {
-		if op != nil {
-			op(opt)
+	opt := &loggerOptions{logInfo: true, logSql: true, logOther: true}
+	for _, o := range options {
+		if o != nil {
+			o(opt)
 		}
 	}
 	return &LoggerLogger{logger: logger, options: opt}
 }
 
-// Print does nothing for log.
-func (g *SilenceLogger) Print(...interface{}) {}
+// =======
+// methods
+// =======
 
-// Print logs to logrus.Logger, see gorm.LogFormatter for details.
+// Print implements gorm.logger interface, it logs to logrus.Logger.
 func (g *LogrusLogger) Print(v ...interface{}) {
 	if !_enable || len(v) <= 1 {
 		return
@@ -142,7 +141,7 @@ func (g *LogrusLogger) Print(v ...interface{}) {
 	}
 }
 
-// Print logs to logrus.StdLogger, see gorm.LogFormatter for details.
+// Print implements gorm.logger interface, it logs to logrus.StdLogger.
 func (g *LoggerLogger) Print(v ...interface{}) {
 	if !_enable || len(v) <= 1 {
 		return
@@ -155,7 +154,12 @@ func (g *LoggerLogger) Print(v ...interface{}) {
 	}
 }
 
+// ========
+// internal
+// ========
+
 // formatLoggerAndFields formats interface{}-s to logger string and logrus.Fields.
+//
 // Logs like:
 // 	[Gorm] [info] registering callback `new_deleted_at_before_query_callback` from F:/Projects/ahlib-db/xgorm/hook.go:36
 // 	[Gorm] [log] Error 1062: Duplicate entry '1' for key 'PRIMARY'

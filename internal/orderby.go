@@ -4,31 +4,10 @@ import (
 	"strings"
 )
 
-// PropertyValue represents a PO entity's property mapping rule.
+// PropertyValue is a struct type of database entity's property mapping rule, used in GenerateOrderByExp.
 type PropertyValue struct {
-	// destinations represents mapping property destination array.
-	//
-	// If using sql, use `property_name` directly.
-	// If using cypher, use `returned_name.property_name`.
 	destinations []string
-
-	// reverse represents the switcher for revert of order
-	reverse bool
-}
-
-// PropertyDict represents a DTO-PO PropertyValue dictionary, used in GenerateOrderByExp.
-type PropertyDict map[string]*PropertyValue
-
-// NewPropertyValue creates a PropertyValue by given reverse and destinations.
-func NewPropertyValue(reverse bool, destinations ...string) *PropertyValue {
-	finalDestinations := make([]string, 0, len(destinations))
-	for _, dest := range destinations {
-		dest = strings.TrimSpace(dest)
-		if dest != "" {
-			finalDestinations = append(finalDestinations, dest) // filter empty destination
-		}
-	}
-	return &PropertyValue{reverse: reverse, destinations: finalDestinations}
+	reverse      bool
 }
 
 // Destinations returns the destinations of PropertyValue.
@@ -41,16 +20,36 @@ func (p *PropertyValue) Reverse() bool {
 	return p.reverse
 }
 
-// GenerateOrderByExp returns a generated orderBy expression by given source dto order string (split by ",", such as "name desc,age asc") and PropertyDict.
-// The generated expression is in mysql-sql and neo4j-cypher style, that is "xx ASC", "xx DESC".
+// PropertyDict is a dictionary type to store pairs from data transfer object to database entity's PropertyValue, used in GenerateOrderByExp.
+type PropertyDict map[string]*PropertyValue
+
+// NewPropertyValue creates a PropertyValue by given reverse and destinations, used to describe database entity's property mapping rule.
+//
+// Here:
+// 1. `destinations` represent mapping property destination array, use `property_name` directly for sql, use `returned_name.property_name` for cypher.
+// 2. `reverse` represents the flag whether you need to revert the order or not.
+func NewPropertyValue(reverse bool, destinations ...string) *PropertyValue {
+	finalDestinations := make([]string, 0, len(destinations))
+	for _, d := range destinations {
+		d = strings.TrimSpace(d)
+		if len(d) > 0 {
+			finalDestinations = append(finalDestinations, d)
+		}
+	}
+	return &PropertyValue{reverse: reverse, destinations: finalDestinations}
+}
+
+// GenerateOrderByExp returns a generated order-by expression by given source (query string) order string (such as "name desc, age asc") and PropertyDict.
+// The generated expression is in mysql-sql or neo4j-cypher style (such as "xxx ASC" or "xxx.yyy DESC").
 func GenerateOrderByExp(source string, dict PropertyDict) string {
 	source = strings.TrimSpace(source)
 	if source == "" || len(dict) == 0 {
 		return ""
 	}
 
-	result := make([]string, 0)
-	for _, src := range strings.Split(source, ",") {
+	sources := strings.Split(source, ",")
+	result := make([]string, 0, len(sources))
+	for _, src := range sources {
 		src = strings.TrimSpace(src)
 		if src == "" {
 			continue

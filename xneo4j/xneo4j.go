@@ -1,7 +1,7 @@
 package xneo4j
 
 import (
-	"github.com/Aoi-hosizora/ahlib-db/internal"
+	"github.com/Aoi-hosizora/ahlib-db/xneo4j/internal"
 	"github.com/neo4j/neo4j-go-driver/neo4j"
 	"time"
 )
@@ -39,7 +39,7 @@ func Collect(result neo4j.Result, err error) ([]neo4j.Record, neo4j.ResultSummar
 	return records, summary, nil
 }
 
-// WithEncrypted returns a neo4j.Config function to set encrypted switcher for neo4j.Driver.
+// WithEncrypted returns a neo4j.Config function to set encrypted flag for neo4j.Driver.
 func WithEncrypted(encrypted bool) func(*neo4j.Config) {
 	return func(config *neo4j.Config) {
 		config.Encrypted = encrypted
@@ -134,19 +134,23 @@ func GetDuration(data interface{}) neo4j.Duration {
 	return data.(neo4j.Duration)
 }
 
-// PropertyValue represents a PO entity's property mapping rule.
+// PropertyValue is a struct type of database entity's property mapping rule, used in GenerateOrderByExp.
 type PropertyValue = internal.PropertyValue
 
-// PropertyDict represents a DTO-PO PropertyValue dictionary, used in GenerateOrderByExp.
+// PropertyDict is a dictionary type to store pairs from data transfer object to database entity's PropertyValue, used in GenerateOrderByExp.
 type PropertyDict = internal.PropertyDict
 
-// NewPropertyValue creates a PropertyValue by given reverse and destinations.
+// NewPropertyValue creates a PropertyValue by given reverse and destinations, used to describe database entity's property mapping rule.
+//
+// Here:
+// 1. `destinations` represent mapping property destination array, use `property_name` directly for sql, use `returned_name.property_name` for cypher.
+// 2. `reverse` represents the flag whether you need to revert the order or not.
 func NewPropertyValue(reverse bool, destinations ...string) *PropertyValue {
 	return internal.NewPropertyValue(reverse, destinations...)
 }
 
-// GenerateOrderByExp returns a generated orderBy expression by given source dto order string (split by ",", such as "name desc, age asc") and PropertyDict.
-// The generated expression is in mysql-sql or neo4j-cypher style, that is "xx ASC", "xx.yy DESC".
+// GenerateOrderByExp returns a generated order-by expression by given source (query string) order string (such as "name desc, age asc") and PropertyDict.
+// The generated expression is in mysql-sql or neo4j-cypher style (such as "xxx ASC" or "xxx.yyy DESC").
 func GenerateOrderByExp(source string, dict PropertyDict) string {
 	return internal.GenerateOrderByExp(source, dict)
 }

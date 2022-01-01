@@ -24,7 +24,7 @@
 ### Dependencies
 
 + See [go.mod](./go.mod) and [go.sum](./go.sum)
-+ `github.com/Aoi-hosizora/ahlib v1.5.0`
++ `github.com/Aoi-hosizora/ahlib v1.6.0`
 + `github.com/jinzhu/gorm v1.9.15`
 + `github.com/go-sql-driver/mysql v1.5.0`
 + `github.com/mattn/go-sqlite3 v1.14.0`
