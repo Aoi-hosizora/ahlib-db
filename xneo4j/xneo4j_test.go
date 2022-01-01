@@ -5,7 +5,6 @@ import (
 	"github.com/neo4j/neo4j-go-driver/neo4j"
 	"github.com/sirupsen/logrus"
 	"log"
-	"os"
 	"reflect"
 	"testing"
 	"time"
@@ -218,7 +217,7 @@ func TestHelper(t *testing.T) {
 func TestLogger(t *testing.T) {
 	l1 := logrus.New()
 	l1.SetFormatter(&logrus.TextFormatter{ForceColors: true, FullTimestamp: true, TimestampFormat: time.RFC3339})
-	l2 := log.New(os.Stderr, "", log.LstdFlags)
+	l2 := log.Default()
 
 	for _, tc := range []struct {
 		name      string
@@ -231,9 +230,9 @@ func TestLogger(t *testing.T) {
 		{"logrus_field", func(s neo4j.Session) neo4j.Session {
 			return NewLogrusLogger(s, l1, WithSkip(1), WithCounterField(true))
 		}},
-		{"logger", func(s neo4j.Session) neo4j.Session { return NewLoggerLogger(s, l2) }},
+		{"logger", func(s neo4j.Session) neo4j.Session { return NewStdLogger(s, l2) }},
 		{"logger_no_xxx", func(s neo4j.Session) neo4j.Session {
-			return NewLoggerLogger(s, l2, WithLogErr(false), WithLogCypher(false))
+			return NewStdLogger(s, l2, WithLogErr(false), WithLogCypher(false))
 		}},
 		{"disable", func(s neo4j.Session) neo4j.Session { return NewLogrusLogger(s, l1) }},
 	} {

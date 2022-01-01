@@ -8,60 +8,70 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 )
 
-// loggerOptions is a type of LogrusLogger's option and LoggerLogger's option, each field can be set by LoggerOption function type.
+// loggerOptions is a type of LogrusLogger and StdLogger's option, each field can be set by LoggerOption function type.
 type loggerOptions struct {
 	logInfo  bool
-	logSql   bool
+	logSQL   bool
 	logOther bool
 }
 
-// LoggerOption represents an option type for LogrusLogger's option and LoggerLogger's option, can be created by WithXXX functions.
+// LoggerOption represents an option type for LogrusLogger's option and StdLogger's option, can be created by WithXXX functions.
 type LoggerOption func(*loggerOptions)
 
 // WithLogInfo creates a LoggerOption to decide whether to do log for [INFO] or not, defaults to true.
-func WithLogInfo(logInfo bool) LoggerOption {
+func WithLogInfo(log bool) LoggerOption {
 	return func(o *loggerOptions) {
-		o.logInfo = logInfo
+		o.logInfo = log
 	}
 }
 
-// WithLogSql creates a LoggerOption to decide whether to do log for [SQL] or not, defaults to true.
-func WithLogSql(logSql bool) LoggerOption {
+// WithLogSQL creates a LoggerOption to decide whether to do log for [SQL] or not, defaults to true.
+func WithLogSQL(log bool) LoggerOption {
 	return func(o *loggerOptions) {
-		o.logSql = logSql
+		o.logSQL = log
 	}
 }
 
 // WithLogOther creates a LoggerOption to decide whether to do log for other type (such as [LOG]) or not, defaults to true.
-func WithLogOther(logOther bool) LoggerOption {
+func WithLogOther(log bool) LoggerOption {
 	return func(o *loggerOptions) {
-		o.logOther = logOther
+		o.logOther = log
 	}
 }
 
-// _enable is a global flag to control behaviors of LogrusLogger and LoggerLogger.
-var _enable = true
-
-// EnableLogger enables LogrusLogger and LoggerLogger to do any log.
-func EnableLogger() {
+var (
+	// _enable is a global flag to control behaviors of LogrusLogger and StdLogger.
 	_enable = true
+
+	// _enableMu locks _enable.
+	_enableMu sync.RWMutex
+)
+
+// EnableLogger enables LogrusLogger and StdLogger to do any log.
+func EnableLogger() {
+	_enableMu.Lock()
+	_enable = true
+	_enableMu.Unlock()
 }
 
-// DisableLogger disables LogrusLogger and LoggerLogger.
+// DisableLogger disables LogrusLogger and StdLogger.
 func DisableLogger() {
+	_enableMu.Lock()
 	_enable = false
+	_enableMu.Unlock()
 }
 
-// ILogger abstracts gorm's internal logger to an interface.
+// ILogger abstracts gorm's internal logger to an interface, equals to gorm.logger interface.
 type ILogger interface {
 	Print(v ...interface{})
 }
 
-// SilenceLogger represents a gorm's logger, used to hide all logs, such as "SQL" and "INFO". Note that `gorm.DB.LogMode(false)` will only hide "SQL" message.
+// SilenceLogger represents a gorm's logger, used to hide all logs (such as "SQL" and "INFO"). Note that `gorm.DB.LogMode(false)` will only hide "SQL" message.
 type SilenceLogger struct{}
 
 // NewSilenceLogger creates a new SilenceLogger.
@@ -74,13 +84,13 @@ func NewSilenceLogger() *SilenceLogger {
 	return &SilenceLogger{}
 }
 
-// Print implements gorm.logger interface, it does nothing for log.
-func (g *SilenceLogger) Print(...interface{}) {}
+// Print implements gorm.logger interface, it does nothing for logging.
+func (s *SilenceLogger) Print(...interface{}) {}
 
-// LogrusLogger represents a gorm's logger, used to log "SQL" and "INFO" message to logrus.Logger.
+// LogrusLogger represents a gorm's logger, used to log gorm's executing message to logrus.Logger.
 type LogrusLogger struct {
-	logger  *logrus.Logger
-	options *loggerOptions
+	logger *logrus.Logger
+	option *loggerOptions
 }
 
 // NewLogrusLogger creates a new LogrusLogger using given logrus.Logger and LoggerOption-s.
@@ -92,65 +102,71 @@ type LogrusLogger struct {
 // 	l.SetFormatter(&logrus.TextFormatter{})
 // 	db.SetLogger(xgorm.NewLogrusLogger(l))
 func NewLogrusLogger(logger *logrus.Logger, options ...LoggerOption) *LogrusLogger {
-	opt := &loggerOptions{logInfo: true, logSql: true, logOther: true}
+	opt := &loggerOptions{logInfo: true, logSQL: true, logOther: true}
 	for _, o := range options {
 		if o != nil {
 			o(opt)
 		}
 	}
-	return &LogrusLogger{logger: logger, options: opt}
+	return &LogrusLogger{logger: logger, option: opt}
 }
 
-// LoggerLogger represents a gorm's logger, used to log "SQL" and "INFO" message to logrus.StdLogger.
-type LoggerLogger struct {
-	logger  logrus.StdLogger
-	options *loggerOptions
+// StdLogger represents a gorm's logger, used to log gorm's executing message to logrus.StdLogger.
+type StdLogger struct {
+	logger logrus.StdLogger
+	option *loggerOptions
 }
 
-// NewLoggerLogger creates a new LoggerLogger using given logrus.StdLogger and LoggerOption-s.
+// NewStdLogger creates a new StdLogger using given logrus.StdLogger and LoggerOption-s.
 //
 // Example:
 // 	db, err := gorm.Open("mysql", dsn)
 // 	db.LogMode(true) // must be true
-// 	l := log.New(os.Stderr, "", log.LstdFlags)
-// 	db.SetLogger(xgorm.NewLoggerLogger(l))
-func NewLoggerLogger(logger logrus.StdLogger, options ...LoggerOption) *LoggerLogger {
-	opt := &loggerOptions{logInfo: true, logSql: true, logOther: true}
+// 	l := log.Default()
+// 	db.SetLogger(xgorm.NewStdLogger(l))
+func NewStdLogger(logger logrus.StdLogger, options ...LoggerOption) *StdLogger {
+	opt := &loggerOptions{logInfo: true, logSQL: true, logOther: true}
 	for _, o := range options {
 		if o != nil {
 			o(opt)
 		}
 	}
-	return &LoggerLogger{logger: logger, options: opt}
+	return &StdLogger{logger: logger, option: opt}
 }
 
 // =======
 // methods
 // =======
 
-// Print implements gorm.logger interface, it logs to logrus.Logger.
-func (g *LogrusLogger) Print(v ...interface{}) {
-	if !_enable || len(v) <= 1 {
-		return
+// Print implements gorm.logger interface, it logs gorm's message to logrus.Logger.
+func (l *LogrusLogger) Print(v ...interface{}) {
+	_enableMu.RLock()
+	enable := _enable
+	_enableMu.RUnlock()
+	if !enable || len(v) <= 1 {
+		return // ignore
 	}
 
-	// info & sql & ...
-	msg, fields := formatLoggerAndFields(v, g.options)
-	if msg != "" {
-		g.logger.WithFields(fields).Info(msg)
+	// [INFO] or [SQL] or [LOG] or ...
+	m, f := extractLoggerData(v, l.option)
+	if m != "" {
+		l.logger.WithFields(f).Info(m)
 	}
 }
 
-// Print implements gorm.logger interface, it logs to logrus.StdLogger.
-func (g *LoggerLogger) Print(v ...interface{}) {
-	if !_enable || len(v) <= 1 {
-		return
+// Print implements gorm.logger interface, it logs gorm's message to logrus.StdLogger.
+func (s *StdLogger) Print(v ...interface{}) {
+	_enableMu.RLock()
+	enable := _enable
+	_enableMu.RUnlock()
+	if !enable || len(v) <= 1 {
+		return // ignore
 	}
 
-	// info & sql & ...
-	msg, _ := formatLoggerAndFields(v, g.options)
-	if msg != "" {
-		g.logger.Print(msg)
+	// [INFO] or [SQL] or [LOG] or ...
+	m, _ := extractLoggerData(v, s.option)
+	if m != "" {
+		s.logger.Print(m)
 	}
 }
 
@@ -158,7 +174,7 @@ func (g *LoggerLogger) Print(v ...interface{}) {
 // internal
 // ========
 
-// formatLoggerAndFields formats interface{}-s to logger string and logrus.Fields.
+// extractLoggerData extracts and formats given values to logger message and logrus.Fields, see gorm.LogFormatter for more details.
 //
 // Logs like:
 // 	[Gorm] [info] registering callback `new_deleted_at_before_query_callback` from F:/Projects/ahlib-db/xgorm/hook.go:36
@@ -166,43 +182,35 @@ func (g *LoggerLogger) Print(v ...interface{}) {
 // 	[Gorm]       1 |     1.9957ms | SELECT * FROM `tbl_test`   ORDER BY `tbl_test`.`id` ASC LIMIT 1 | F:/Projects/ahlib-db/xgorm/xgorm_test.go:48
 // 	      |-------| |------------| |---------------------------------------------------------------| |-------------------------------------------|
 // 	          7           12                                      ...                                                       ...
-func formatLoggerAndFields(v []interface{}, options *loggerOptions) (string, logrus.Fields) {
+func extractLoggerData(v []interface{}, option *loggerOptions) (string, logrus.Fields) {
 	var msg string
 	var fields logrus.Fields
 
 	if len(v) == 2 {
-		// info
-		if !options.logInfo {
+		// [INFO]
+		if !option.logInfo {
 			return "", nil
 		}
-		fields = logrus.Fields{
-			"module": "gorm",
-			"type":   v[0],
-			"info":   v[1],
-		}
 		msg = fmt.Sprintf("[Gorm] %v", v[1])
+		fields = logrus.Fields{"module": "gorm", "type": v[0], "info": v[1]}
 	} else if v[0] != "sql" {
-		// other
-		if !options.logOther {
+		// [LOG], other ...
+		if !option.logOther {
 			return "", nil
 		}
 		s := fmt.Sprint(v[2:]...)
-		fields = logrus.Fields{
-			"module":  "gorm",
-			"type":    v[0],
-			"message": s,
-		}
 		msg = fmt.Sprintf("[Gorm] [%v] %v", v[0], s)
+		fields = logrus.Fields{"module": "gorm", "type": v[0], "message": s}
 	} else {
-		// sql
-		if !options.logSql {
+		// [SQL]
+		if !option.logSQL {
 			return "", nil
 		}
 		source := v[1]
 		duration := v[2].(time.Duration)
 		sql := render(v[3].(string), v[4].([]interface{}))
 		rows := v[5].(int64)
-
+		msg = fmt.Sprintf("[Gorm] %7d | %12s | %s | %s", rows, duration, sql, source)
 		fields = logrus.Fields{
 			"module":   "gorm",
 			"type":     "sql",
@@ -211,19 +219,12 @@ func formatLoggerAndFields(v []interface{}, options *loggerOptions) (string, log
 			"duration": duration,
 			"source":   source,
 		}
-		msg = fmt.Sprintf("[Gorm] %7d | %12s | %s | %s", rows, duration, sql, source)
 	}
 
 	return msg, fields
 }
 
-// some regexps used in render.
-var (
-	_placeholderRegexp        = regexp.MustCompile(`\?`)
-	_numericPlaceholderRegexp = regexp.MustCompile(`\$\d+`)
-)
-
-// isPrintable is a string util function used in render.
+// isPrintable is a string utility function used in render.
 func isPrintable(s string) bool {
 	for _, r := range s {
 		if !unicode.IsPrint(r) {
@@ -233,7 +234,13 @@ func isPrintable(s string) bool {
 	return true
 }
 
-// render renders sql string and parameters to complete sql expression.
+// some regexps used in render.
+var (
+	_placeholderRegexp        = regexp.MustCompile(`\?`)
+	_numericPlaceholderRegexp = regexp.MustCompile(`\$\d+`)
+)
+
+// render renders given sql string and parameters to form the sql expression.
 func render(sql string, params []interface{}) string {
 	values := make([]string, 0, len(params))
 	for _, v := range params {

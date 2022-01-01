@@ -36,18 +36,18 @@ func IsPostgreSQL(db *gorm.DB) bool {
 	return db.Dialect().GetName() == Postgres
 }
 
-// MySQLConfig is an alias type of mysql.Config, can be used to generate dsl by MySQLConfig.FormatDSN method.
+// MySQLConfig is an alias type of mysql.Config, can be used to generate dsl by FormatDSN method.
 type MySQLConfig = mysql.Config
 
-// MySQLDefaultDsn returns the MySQL dsn from given parameters with "utf8mb4" charset and "local" location, parseTime and Local location. If you want to set more
-// options in dsn, please use mysql.Config or xgorm.MySQLConfig. For more information, please visit https://github.com/go-sql-driver/mysql#dsn-data-source-name.
+// MySQLDefaultDsn returns the MySQL dsn from given parameters with "utf8mb4" charset and "local" location. If you want to set more options in dsn,
+// please use mysql.Config or xgorm.MySQLConfig. For more information, please visit https://github.com/go-sql-driver/mysql#dsn-data-source-name.
 func MySQLDefaultDsn(username, password, address, database string) string {
 	return fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8mb4&parseTime=True&loc=Local", username, password, address, database)
 }
 
 // SQLiteDefaultDsn returns the SQLite dsn from given username. For more information, please visit https://github.com/mattn/go-sqlite3#connection-string.
 func SQLiteDefaultDsn(filename string) string {
-	return fmt.Sprintf("file:%s", filename)
+	return filename // fmt.Sprintf("file:%s", filename)
 }
 
 // PostgresDefaultDsn returns the Postgres dsn from given parameters. For more information, please visit

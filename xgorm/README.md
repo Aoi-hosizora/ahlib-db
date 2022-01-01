@@ -19,11 +19,11 @@
 + `type MySQLConfig struct`
 + `type PropertyValue struct`
 + `type PropertyDict map`
-+ `type ILogger interface`
 + `type LoggerOption func`
++ `type ILogger interface`
 + `type SilenceLogger struct`
 + `type LogrusLogger struct`
-+ `type LoggerLogger struct`
++ `type StdLogger struct`
 
 ### Variables
 
@@ -57,19 +57,19 @@
 + `func DeleteErr(rdb *gorm.DB) (xstatus.DbStatus, error)`
 + `func NewPropertyValue(reverse bool, destinations ...string) *PropertyValue`
 + `func GenerateOrderByExp(source string, dict PropertyDict) string`
-+ `func WithLogInfo(logInfo bool) LoggerOption`
-+ `func WithLogSql(logSql bool) LoggerOption`
-+ `func WithLogOther(logOther bool) LoggerOption`
++ `func WithLogInfo(log bool) LoggerOption`
++ `func WithLogSQL(log bool) LoggerOption`
++ `func WithLogOther(log bool) LoggerOption`
 + `func EnableLogger()`
 + `func DisableLogger()`
 + `func NewSilenceLogger() *SilenceLogger`
 + `func NewLogrusLogger(logger *logrus.Logger, options ...LoggerOption) *LogrusLogger`
-+ `func NewLoggerLogger(logger logrus.StdLogger, options ...LoggerOption) *LoggerLogger`
++ `func NewStdLogger(logger logrus.StdLogger, options ...LoggerOption) *StdLogger`
 
 ### Methods
 
 + `func (p *PropertyValue) Destinations() []string`
 + `func (p *PropertyValue) Reverse() bool`
-+ `func (g *SilenceLogger) Print(...interface{})`
-+ `func (g *LogrusLogger) Print(v ...interface{})`
-+ `func (g *LoggerLogger) Print(v ...interface{})`
++ `func (s *SilenceLogger) Print(...interface{})`
++ `func (l *LogrusLogger) Print(v ...interface{})`
++ `func (s *StdLogger) Print(v ...interface{})`

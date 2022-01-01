@@ -17,7 +17,7 @@
 + `type Pool struct`
 + `type LoggerOption func`
 + `type LogrusLogger struct`
-+ `type LoggerLogger struct`
++ `type StdLogger struct`
 
 ### Variables
 
@@ -51,14 +51,14 @@
 + `func NewPropertyValue(reverse bool, destinations ...string) *PropertyValue`
 + `func GenerateOrderByExp(source string, dict PropertyDict) string`
 + `func NewPool(driver neo4j.Driver, dial DialHandler) *Pool`
-+ `func WithLogErr(logErr bool) LoggerOption`
-+ `func WithLogCmd(logCmd bool) LoggerOption`
-+ `func WithSkip(skip int) LoggerOption`
++ `func WithLogErr(log bool) LoggerOption`
++ `func WithLogCypher(log bool) LoggerOption`
 + `func WithCounterField(flag bool) LoggerOption`
++ `func WithSkip(skip int) LoggerOption`
 + `func EnableLogger()`
 + `func DisableLogger()`
 + `func NewLogrusLogger(session neo4j.Session, logger *logrus.Logger, options ...LoggerOption) *LogrusLogger`
-+ `func NewLoggerLogger(session neo4j.Session, logger logrus.StdLogger, options ...LoggerOption) *LoggerLogger`
++ `func NewStdLogger(session neo4j.Session, logger logrus.StdLogger, options ...LoggerOption) *StdLogger`
 
 ### Methods
 
@@ -72,4 +72,4 @@
 + `func (p *Pool) VerifyConnectivity() error`
 + `func (p *Pool) Close() error`
 + `func (l *LogrusLogger) Run(cypher string, params map[string]interface{}, configurers ...func(*neo4j.TransactionConfig)) (neo4j.Result, error)`
-+ `func (l *LoggerLogger) Run(cypher string, params map[string]interface{}, configurers ...func(*neo4j.TransactionConfig)) (neo4j.Result, error)`
++ `func (s *StdLogger) Run(cypher string, params map[string]interface{}, configurers ...func(*neo4j.TransactionConfig)) (neo4j.Result, error)`

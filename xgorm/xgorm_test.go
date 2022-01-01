@@ -7,7 +7,6 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/sirupsen/logrus"
 	"log"
-	"os"
 	"testing"
 	"time"
 )
@@ -173,7 +172,7 @@ func testHelper(t *testing.T, giveDialect, giveParam string) {
 func testLogger(t *testing.T, giveDialect, giveParam string) {
 	l1 := logrus.New()
 	l1.SetFormatter(&logrus.TextFormatter{ForceColors: true, FullTimestamp: true, TimestampFormat: time.RFC3339})
-	l2 := log.New(os.Stderr, "", log.LstdFlags)
+	l2 := log.Default()
 
 	for _, tc := range []struct {
 		name   string
@@ -185,10 +184,10 @@ func testLogger(t *testing.T, giveDialect, giveParam string) {
 		{"silence", true, NewSilenceLogger()},
 		{"logrus", true, NewLogrusLogger(l1)},
 		{"logrus_no_info", true, NewLogrusLogger(l1, WithLogInfo(false))},
-		{"logrus_no_sql", true, NewLogrusLogger(l1, WithLogSql(false))},
+		{"logrus_no_sql", true, NewLogrusLogger(l1, WithLogSQL(false))},
 		{"logrus_no_other", true, NewLogrusLogger(l1, WithLogOther(false))},
-		{"logger", true, NewLoggerLogger(l2)},
-		{"logger_no_xxx", true, NewLoggerLogger(l2, WithLogInfo(false), WithLogSql(false), WithLogOther(false))},
+		{"logger", true, NewStdLogger(l2)},
+		{"logger_no_xxx", true, NewStdLogger(l2, WithLogInfo(false), WithLogSQL(false), WithLogOther(false))},
 		{"disable", true, NewLogrusLogger(l1)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

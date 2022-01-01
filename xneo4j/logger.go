@@ -10,31 +10,39 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 )
 
-// loggerOptions is a type of LogrusLogger's option and LoggerLogger's option, each field can be set by LoggerOption function type.
+// loggerOptions is a type of LogrusLogger and StdLogger's option, each field can be set by LoggerOption function type.
 type loggerOptions struct {
 	logErr       bool
 	logCypher    bool
-	skip         int
 	counterField bool
+	skip         int
 }
 
-// LoggerOption represents an option type for LogrusLogger's option and LoggerLogger's option, can be created by WithXXX functions.
+// LoggerOption represents an option type for LogrusLogger's option and StdLogger's option, can be created by WithXXX functions.
 type LoggerOption func(*loggerOptions)
 
 // WithLogErr creates a LoggerOption to decide whether to do log for errors or not, defaults to true.
-func WithLogErr(logErr bool) LoggerOption {
+func WithLogErr(log bool) LoggerOption {
 	return func(o *loggerOptions) {
-		o.logErr = logErr
+		o.logErr = log
 	}
 }
 
 // WithLogCypher creates a LoggerOption to decide whether to do log for cyphers or not, defaults to true.
-func WithLogCypher(logCypher bool) LoggerOption {
+func WithLogCypher(log bool) LoggerOption {
 	return func(o *loggerOptions) {
-		o.logCypher = logCypher
+		o.logCypher = log
+	}
+}
+
+// WithCounterField creates a LoggerOption to decide whether to do store counter fields to logrus.Fields or not, defaults to false.
+func WithCounterField(flag bool) LoggerOption {
+	return func(o *loggerOptions) {
+		o.counterField = flag
 	}
 }
 
@@ -45,120 +53,118 @@ func WithSkip(skip int) LoggerOption {
 	}
 }
 
-// WithCounterField creates a LoggerOption to decide whether to do log for counter fields or not, defaults to false.
-func WithCounterField(flag bool) LoggerOption {
-	return func(o *loggerOptions) {
-		o.counterField = flag
-	}
-}
-
-// _enable is a global flag to control behaviors of LogrusLogger and LoggerLogger.
-var _enable = true
-
-// EnableLogger enables LogrusLogger and LoggerLogger to do any log.
-func EnableLogger() {
+var (
+	// _enable is a global flag to control behaviors of LogrusLogger and StdLogger.
 	_enable = true
+
+	// _enableMu locks _enable.
+	_enableMu sync.RWMutex
+)
+
+// EnableLogger enables LogrusLogger and StdLogger to do any log.
+func EnableLogger() {
+	_enableMu.Lock()
+	_enable = true
+	_enableMu.Unlock()
 }
 
-// DisableLogger disables LogrusLogger and LoggerLogger.
+// DisableLogger disables LogrusLogger and StdLogger.
 func DisableLogger() {
+	_enableMu.Lock()
 	_enable = false
+	_enableMu.Unlock()
 }
 
-// LogrusLogger represents a neo4j.Session, used to log neo4j cypher executing message to logrus.Logger.
+// LogrusLogger represents a neo4j.Session as neo4j's logger, used to log neo4j's executing message to logrus.Logger.
 type LogrusLogger struct {
 	neo4j.Session
-	logger  *logrus.Logger
-	options *loggerOptions
+	logger *logrus.Logger
+	option *loggerOptions
 }
 
 // NewLogrusLogger creates a new LogrusLogger using given logrus.Logger and LoggerOption-s.
 //
 // Example:
-// 	driver, err := neo4j.NewDriver(target, auth)
-// 	session, err := driver.Session(neo4j.AccessModeRead)
+// 	driver, err := neo4j.NewDriver(...)
+// 	sess, err := driver.Session(neo4j.AccessModeRead)
 // 	l := logrus.New()
 // 	l.SetFormatter(&logrus.TextFormatter{})
-// 	session = NewLogrusLogger(session, l) // with default skip 1
+// 	sess = NewLogrusLogger(sess, l)
 func NewLogrusLogger(session neo4j.Session, logger *logrus.Logger, options ...LoggerOption) *LogrusLogger {
-	opt := &loggerOptions{
-		logErr:       true,
-		logCypher:    true,
-		skip:         1,
-		counterField: false,
-	}
+	opt := &loggerOptions{logErr: true, logCypher: true, counterField: false, skip: 1}
 	for _, op := range options {
 		if op != nil {
 			op(opt)
 		}
 	}
-	return &LogrusLogger{Session: session, logger: logger, options: opt}
+	return &LogrusLogger{Session: session, logger: logger, option: opt}
 }
 
-// LoggerLogger represents a neo4j.Session, used to log neo4j cypher executing message to logrus.StdLogger.
-type LoggerLogger struct {
+// StdLogger represents a neo4j.Session as neo4j's logger, used to log neo4j's executing message to logrus.StdLogger.
+type StdLogger struct {
 	neo4j.Session
-	logger  logrus.StdLogger
-	options *loggerOptions
+	logger logrus.StdLogger
+	option *loggerOptions
 }
 
-// NewLoggerLogger creates a new LoggerLogger using given log.Logger and LoggerOption-s.
+// NewStdLogger creates a new StdLogger using given log.Logger and LoggerOption-s.
 //
 // Example:
-// 	driver, err := neo4j.NewDriver(target, auth)
-// 	session, err := driver.Session(neo4j.AccessModeRead)
-// 	l := log.New(os.Stderr, "", log.LstdFlags)
-// 	session = NewLoggerLogger(session, l) // with default skip 1
-func NewLoggerLogger(session neo4j.Session, logger logrus.StdLogger, options ...LoggerOption) *LoggerLogger {
-	opt := &loggerOptions{
-		logErr:       true,
-		logCypher:    true,
-		skip:         1,
-		counterField: false,
-	}
+// 	driver, err := neo4j.NewDriver(...)
+// 	sess, err := driver.Session(neo4j.AccessModeRead)
+// 	l := log.Default()
+// 	sess = NewStdLogger(sess, l)
+func NewStdLogger(session neo4j.Session, logger logrus.StdLogger, options ...LoggerOption) *StdLogger {
+	opt := &loggerOptions{logErr: true, logCypher: true, counterField: false, skip: 1}
 	for _, op := range options {
 		if op != nil {
 			op(opt)
 		}
 	}
-	return &LoggerLogger{Session: session, logger: logger, options: opt}
+	return &StdLogger{Session: session, logger: logger, option: opt}
 }
 
 // =======
 // methods
 // =======
 
-// Run implements neo4j.Session interface, it executes given cypher and params, and logs to logrus.Logger.
+// Run implements neo4j.Session interface, it executes given cypher and params, and logs neo4j's message to logrus.Logger.
 func (l *LogrusLogger) Run(cypher string, params map[string]interface{}, configurers ...func(*neo4j.TransactionConfig)) (neo4j.Result, error) {
 	result, err := l.Session.Run(cypher, params, configurers...)
-	if !_enable {
-		return result, err
+	_enableMu.RLock()
+	enable := _enable
+	_enableMu.RUnlock()
+	if !enable {
+		return result, err // ignore
 	}
 
-	_, file, line, _ := runtime.Caller(l.options.skip)
+	_, file, line, _ := runtime.Caller(l.option.skip) // defaults to 4
 	source := fmt.Sprintf("%s:%d", file, line)
-	msg, fields, isErr := formatLoggerAndFields(result, err, source, l.options)
-	if isErr && l.options.logErr {
-		l.logger.WithFields(fields).Error(msg)
-	} else if !isErr && l.options.logCypher {
-		l.logger.WithFields(fields).Info(msg)
+	m, f, isErr := extractLoggerData(result, err, source, l.option)
+	if isErr && l.option.logErr {
+		l.logger.WithFields(f).Error(m)
+	} else if !isErr && l.option.logCypher {
+		l.logger.WithFields(f).Info(m)
 	}
 
 	return result, err
 }
 
-// Run implements neo4j.Session interface, it executes given cypher and params, and logs to logrus.StdLogger.
-func (l *LoggerLogger) Run(cypher string, params map[string]interface{}, configurers ...func(*neo4j.TransactionConfig)) (neo4j.Result, error) {
-	result, err := l.Session.Run(cypher, params, configurers...)
-	if !_enable {
-		return result, err
+// Run implements neo4j.Session interface, it executes given cypher and params, and logs neo4j's message to logrus.StdLogger.
+func (s *StdLogger) Run(cypher string, params map[string]interface{}, configurers ...func(*neo4j.TransactionConfig)) (neo4j.Result, error) {
+	result, err := s.Session.Run(cypher, params, configurers...)
+	_enableMu.RLock()
+	enable := _enable
+	_enableMu.RUnlock()
+	if !enable {
+		return result, err // ignore
 	}
 
-	_, file, line, _ := runtime.Caller(l.options.skip)
+	_, file, line, _ := runtime.Caller(s.option.skip) // defaults to 4
 	source := fmt.Sprintf("%s:%d", file, line)
-	msg, _, isErr := formatLoggerAndFields(result, err, source, l.options)
-	if (isErr && l.options.logErr) || (!isErr && l.options.logCypher) {
-		l.logger.Print(msg)
+	m, _, isErr := extractLoggerData(result, err, source, s.option)
+	if (isErr && s.option.logErr) || (!isErr && s.option.logCypher) {
+		s.logger.Print(m)
 	}
 
 	return result, err
@@ -168,7 +174,7 @@ func (l *LoggerLogger) Run(cypher string, params map[string]interface{}, configu
 // internal
 // ========
 
-// formatLoggerAndFields formats given neo4j.Result, error, source and loggerOptions to logger string, logrus.Fields and isError flag.
+// extractLoggerData extracts and formats given neo4j.Result, error and source string to logger message and logrus.Fields.
 //
 // Logs like:
 // 	[Neo4j] Connection error: dial tcp [::1]:7687: connectex: No connection could be made because the target machine actively refused it. | F:/Projects/ahlib-db/xneo4j/xneo4j_test.go:97
@@ -176,42 +182,33 @@ func (l *LoggerLogger) Run(cypher string, params map[string]interface{}, configu
 // 	[Neo4j]     -1 |        999ms | MATCH (n {uid: 8}) RETURN n LIMIT 1 | F:/Projects/ahlib-db/xneo4j/xneo4j_test.go:97
 // 	       |------| |------------| |-----------------------------------| |---------------------------------------------|
 // 	          6           12                        ...                                          ...
-func formatLoggerAndFields(result neo4j.Result, err error, source string, options *loggerOptions) (string, logrus.Fields, bool) {
+func extractLoggerData(result neo4j.Result, err error, source string, options *loggerOptions) (string, logrus.Fields, bool) {
 	var msg string
 	var fields logrus.Fields
 	var isErr bool
 
-	if err != nil { // failed to connect (Connection error)
+	if err != nil {
+		// failed to connect (Connection error)
 		// the target machine actively refused it
 		// ...
 		isErr = true
-		fields = logrus.Fields{
-			"module": "neo4j",
-			"type":   "connection",
-			"error":  err,
-			"source": source,
-		}
 		msg = fmt.Sprintf("[Neo4j] %v | %s", err, source)
-	} else if summary, err := result.Summary(); err != nil { // failed to execute (Server error)
+		fields = logrus.Fields{"module": "neo4j", "type": "connection", "error": err, "source": source}
+	} else if summary, err := result.Summary(); err != nil {
+		// failed to execute (Server error)
 		// Neo.ClientError.Security.Unauthorized
 		// Neo.ClientError.Statement.SyntaxError
 		// Neo.ClientError.Statement.TypeError
 		// Neo.ClientError.Schema.ConstraintValidationFailed
 		// ...
 		isErr = true
-		fields = logrus.Fields{
-			"module": "neo4j",
-			"type":   "server",
-			"error":  err,
-			"source": source,
-		}
 		msg = fmt.Sprintf("[Neo4j] %v | %s", err, source)
+		fields = logrus.Fields{"module": "neo4j", "type": "server", "error": err, "source": source}
 	} else {
 		stat := summary.Statement()
-		counters := summary.Counters()
 		cypher := render(stat.Text(), stat.Params())
 		du := summary.ResultAvailableAfter() + summary.ResultConsumedAfter()
-
+		msg = fmt.Sprintf("[Neo4j] %6d | %12s | %s | %s", -1 /* <<< */, du, cypher, source)
 		fields = logrus.Fields{
 			"module":   "neo4j",
 			"type":     "cypher",
@@ -220,8 +217,9 @@ func formatLoggerAndFields(result neo4j.Result, err error, source string, option
 			"duration": du,
 			"source":   source,
 		}
-		// some statistics
 		if options.counterField {
+			// also contains counter statistics
+			counters := summary.Counters()
 			fields["nodesCreated"] = counters.NodesCreated()
 			fields["nodesDeleted"] = counters.NodesDeleted()
 			fields["relationshipsCreated"] = counters.RelationshipsCreated()
@@ -234,13 +232,12 @@ func formatLoggerAndFields(result neo4j.Result, err error, source string, option
 			fields["constraintsAdded"] = counters.ConstraintsAdded()
 			fields["constraintsRemoved"] = counters.ConstraintsRemoved()
 		}
-		msg = fmt.Sprintf("[Neo4j] %6d | %12s | %s | %s", -1, du, cypher, source)
 	}
 
 	return msg, fields, isErr
 }
 
-// render renders cypher string and parameters to complete cypher expression.
+// render renders given cypher string and parameters to form the cypher expression.
 func render(cypher string, params map[string]interface{}) string {
 	values := make(map[string]string, len(params))
 	for k, v := range params {
@@ -252,7 +249,7 @@ func render(cypher string, params map[string]interface{}) string {
 
 		v = indirectValue.Interface()
 		switch value := v.(type) {
-		// Temporal values: https://neo4j.com/docs/cypher-manual/current/syntax/temporal/
+		// 1. Temporal values: https://neo4j.com/docs/cypher-manual/current/syntax/temporal/
 		case neo4j.Date:
 			values[k] = fmt.Sprintf(`date("%s")`, value.String())
 		case neo4j.OffsetTime:
@@ -266,11 +263,11 @@ func render(cypher string, params map[string]interface{}) string {
 		case neo4j.Duration:
 			values[k] = fmt.Sprintf(`duration("%s")`, value.String())
 
-		// Spatial values: https://neo4j.com/docs/cypher-manual/3.5/syntax/spatial/
+		// 2. Spatial values: https://neo4j.com/docs/cypher-manual/3.5/syntax/spatial/
 		case neo4j.Point:
 			values[k] = value.String()
 
-		// Slice and map values:
+		// 3. Slice and map values:
 		case []interface{}:
 			bs, err := json.Marshal(value)
 			if err != nil {
@@ -286,7 +283,7 @@ func render(cypher string, params map[string]interface{}) string {
 				values[k] = xstring.FastBtos(bs)
 			}
 
-		// other types
+		// 4. Other types ...
 		case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64, bool:
 			values[k] = fmt.Sprintf("%v", value)
 		default:

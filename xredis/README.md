@@ -10,11 +10,11 @@
 
 ### Types
 
-+ `type ILogger interface`
 + `type LoggerOption func`
++ `type ILogger interface`
 + `type SilenceLogger struct`
 + `type LogrusLogger struct`
-+ `type LoggerLogger struct`
++ `type StdLogger struct`
 
 ### Variables
 
@@ -29,16 +29,19 @@
 + `func ScanAll(ctx context.Context, client *redis.Client, match string, count int64) (keys []string, err error)`
 + `func DelAll(ctx context.Context, client *redis.Client, pattern string) (tot int64, err error)`
 + `func DelAllByScan(ctx context.Context, client *redis.Client, pattern string, scanCount int64) (tot int64, err error)`
-+ `func WithLogErr(logErr bool) LoggerOption`
-+ `func WithLogCmd(logCmd bool) LoggerOption`
++ `func WithLogErr(log bool) LoggerOption`
++ `func WithLogCmd(log bool) LoggerOption`
++ `func WithSkip(skip int) LoggerOption`
 + `func EnableLogger()`
 + `func DisableLogger()`
 + `func NewSilenceLogger() *SilenceLogger`
-+ `func NewLogrusLogger(logger *logrus.Logger) *LogrusLogger`
-+ `func NewLoggerLogger(logger logrus.StdLogger) *LoggerLogger`
++ `func NewLogrusLogger(logger *logrus.Logger, options ...LoggerOption) *LogrusLogger`
++ `func NewStdLogger(logger logrus.StdLogger, options ...LoggerOption) *StdLogger`
 
 ### Methods
 
-+ `func (l *SilenceLogger) Printf(context.Context, string, ...interface{})`
++ `func (s *SilenceLogger) Printf(context.Context, string, ...interface{})`
++ `func (l *LogrusLogger) BeforeProcess(ctx context.Context, _ redis.Cmder) (context.Context, error)`
 + `func (l *LogrusLogger) AfterProcess(ctx context.Context, cmd redis.Cmder) error`
-+ `func (l *LoggerLogger) AfterProcess(ctx context.Context, cmd redis.Cmder) error`
++ `func (s *StdLogger) BeforeProcess(ctx context.Context, _ redis.Cmder) (context.Context, error)`
++ `func (s *StdLogger) AfterProcess(ctx context.Context, cmd redis.Cmder) error`

@@ -117,7 +117,7 @@ func TestHelper(t *testing.T) {
 func TestLogger(t *testing.T) {
 	l1 := logrus.New()
 	l1.SetFormatter(&logrus.TextFormatter{ForceColors: true, FullTimestamp: true, TimestampFormat: time.RFC3339})
-	l2 := log.New(os.Stderr, "", log.LstdFlags)
+	l2 := log.Default()
 
 	for _, tc := range []struct {
 		name   string
@@ -127,8 +127,8 @@ func TestLogger(t *testing.T) {
 		{"logrus", NewLogrusLogger(l1)},
 		{"logrus_no_err", NewLogrusLogger(l1, WithLogErr(false))},
 		{"logrus_no_cmd", NewLogrusLogger(l1, WithLogCmd(false))},
-		{"logger", NewLoggerLogger(l2)},
-		{"logger_no_xxx", NewLoggerLogger(l2, WithLogErr(false), WithLogCmd(false))},
+		{"logger", NewStdLogger(l2)},
+		{"logger_no_xxx", NewStdLogger(l2, WithLogErr(false), WithLogCmd(false))},
 		{"disable", NewLogrusLogger(l1)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
