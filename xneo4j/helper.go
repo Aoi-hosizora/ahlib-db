@@ -6,21 +6,28 @@ import (
 	"time"
 )
 
-// P represents the cypher parameter type, equals to "map[string]interface{}".
+// Cypher manual 3.5 can refer to https://neo4j.com/docs/cypher-manual/3.5/syntax/.
+// Cypher manual 4.0 can refer to https://neo4j.com/docs/cypher-manual/4.0/syntax/.
+// Neo4j go driver 1.x can refer to https://github.com/neo4j/neo4j-go-driver/tree/1.8.
+// Neo4j go driver 4.x can refer to https://github.com/neo4j/neo4j-go-driver/master.
+
+// P is a cypher parameters type, equals to `map[string]interface{}`.
+//
 // Example:
 // 	session.Run(`MATCH (n {id: $id}) RETURN n`, xneo4j.P{"id": 2})
 type P map[string]interface{}
 
-// Collect loops through the result stream, collects records into a slice and returns the resulting slice with result summary.
-//
-// Cypher manual refers to https://neo4j.com/docs/cypher-manual/3.5/syntax/.
-// Neo4j go driver refers to https://github.com/neo4j/neo4j-go-driver/tree/1.8.
+// =========================
+// collect and get functions
+// =========================
+
+// Collect loops through the result stream, collects records and returns the neo4j.Record slice with neo4j.ResultSummary.
 //
 // Example:
 // 	cypher := "MATCH p = ()-[r :FRIEND]->(n) RETURN r, n"
-// 	records, summary, err := xneo4j.Collect(session.Run(cypher, nil)) // err contains connect and execute error
+// 	records, summary, err := xneo4j.Collect(session.Run(cypher, nil)) // err contains the connection and execution error
 // 	for _, record := range records { // records is a slice of neo4j.Record
-// 		// record is the returned values, each value can be get by `Get` or `GetByIndex` methods
+// 		// record is the returned values, each value can be got by `Get` or `GetByIndex` methods
 // 		rel := xneo4j.GetRel(record.GetByIndex(0))   // neo4j.Relationship
 // 		node := xneo4j.GetNode(record.GetByIndex(1)) // neo4j.Node
 // 	}
@@ -37,13 +44,6 @@ func Collect(result neo4j.Result, err error) ([]neo4j.Record, neo4j.ResultSummar
 		return nil, nil, err // ...
 	}
 	return records, summary, nil
-}
-
-// WithEncrypted returns a neo4j.Config function to set encrypted flag for neo4j.Driver.
-func WithEncrypted(encrypted bool) func(*neo4j.Config) {
-	return func(config *neo4j.Config) {
-		config.Encrypted = encrypted
-	}
 }
 
 // GetInteger returns neo4j Integer value (int64) from given data.
@@ -97,11 +97,8 @@ func GetPath(data interface{}) neo4j.Path {
 }
 
 // GetPoint returns neo4j Point value (neo4j.Point) from given data.
-func GetPoint(data interface{}) *neo4j.Point {
-	if p, ok := data.(neo4j.Point); ok {
-		return &p
-	}
-	return data.(*neo4j.Point)
+func GetPoint(data interface{}) neo4j.Point {
+	return data.(neo4j.Point)
 }
 
 // GetDate returns neo4j Date value (neo4j.Date) from given data.
@@ -134,6 +131,10 @@ func GetDuration(data interface{}) neo4j.Duration {
 	return data.(neo4j.Duration)
 }
 
+// ========
+// order by
+// ========
+
 // PropertyValue is a struct type of database entity's property mapping rule, used in GenerateOrderByExp.
 type PropertyValue = internal.PropertyValue
 
@@ -151,6 +152,92 @@ func NewPropertyValue(reverse bool, destinations ...string) *PropertyValue {
 
 // GenerateOrderByExp returns a generated order-by expression by given source (query string) order string (such as "name desc, age asc") and PropertyDict.
 // The generated expression is in mysql-sql or neo4j-cypher style (such as "xxx ASC" or "xxx.yyy DESC").
+//
+// Example:
+// 	dict := PropertyDict{
+// 		"uid":  NewPropertyValue(false, "p.uid"),
+// 		"name": NewPropertyValue(false, "p.firstname", "p.lastname"),
+// 		"age":  NewPropertyValue(true, "u.birthday"),
+// 	}
+// 	_ = GenerateOrderByExp(`uid, age desc`, dict) // => p.uid ASC, u.birthday ASC
+// 	_ = GenerateOrderByExp(`age, username desc`, dict) // => u.birthday DESC, p.firstname DESC, p.lastname DESC
 func GenerateOrderByExp(source string, dict PropertyDict) string {
 	return internal.GenerateOrderByExp(source, dict)
+}
+
+// ====================
+// neo4j config options
+// ====================
+
+// DriverOption represents an option type for neo4j.NewDriver's option, can be created by WithXXX functions.
+type DriverOption func(*neo4j.Config)
+
+// WithEncrypted returns a neo4j.Config option function to specific encrypted flag for neo4j.Driver, defaults to true.
+func WithEncrypted(encrypted bool) DriverOption {
+	return func(config *neo4j.Config) {
+		config.Encrypted = encrypted
+	}
+}
+
+// WithTrustStrategy returns a neo4j.Config option function to specific trust strategy for neo4j.Driver, defaults to neo4j.TrustAny(false).
+func WithTrustStrategy(e neo4j.TrustStrategy) DriverOption {
+	return func(config *neo4j.Config) {
+		config.TrustStrategy = e
+	}
+}
+
+// WithLog returns a neo4j.Config option function to specific log function for neo4j.Driver, defaults to neo4j.NoOpLogger.
+func WithLog(l neo4j.Logging) DriverOption {
+	return func(config *neo4j.Config) {
+		config.Log = l
+	}
+}
+
+// WithAddressResolver returns a neo4j.Config option function to specific address resolver for neo4j.Driver, defaults to nil.
+func WithAddressResolver(resolver neo4j.ServerAddressResolver) DriverOption {
+	return func(config *neo4j.Config) {
+		config.AddressResolver = resolver
+	}
+}
+
+// WithMaxTransactionRetryTime returns a neo4j.Config option function to specific max transaction retry time for neo4j.Driver, defaults to 30s.
+func WithMaxTransactionRetryTime(t time.Duration) DriverOption {
+	return func(config *neo4j.Config) {
+		config.MaxTransactionRetryTime = t
+	}
+}
+
+// WithMaxConnectionPoolSize returns a neo4j.Config option function to specific max connection pool size for neo4j.Driver, defaults to 100.
+func WithMaxConnectionPoolSize(size int) DriverOption {
+	return func(config *neo4j.Config) {
+		config.MaxConnectionPoolSize = size
+	}
+}
+
+// WithMaxConnectionLifetime returns a neo4j.Config option function to specific max connection lifetime for neo4j.Driver, defaults to 1h.
+func WithMaxConnectionLifetime(t time.Duration) DriverOption {
+	return func(config *neo4j.Config) {
+		config.MaxConnectionLifetime = t
+	}
+}
+
+// WithConnectionAcquisitionTimeout returns a neo4j.Config option function to specific connection acquisition timeout for neo4j.Driver, defaults to 1min.
+func WithConnectionAcquisitionTimeout(t time.Duration) DriverOption {
+	return func(config *neo4j.Config) {
+		config.ConnectionAcquisitionTimeout = t
+	}
+}
+
+// WithSocketConnectTimeout returns a neo4j.Config option function to specific socket connect timeout for neo4j.Driver, defaults to 5s.
+func WithSocketConnectTimeout(t time.Duration) DriverOption {
+	return func(config *neo4j.Config) {
+		config.SocketConnectTimeout = t
+	}
+}
+
+// WithSocketKeepalive returns a neo4j.Config option function to specific socket keepalive flag for neo4j.Driver, defaults to true.
+func WithSocketKeepalive(keepalive bool) DriverOption {
+	return func(config *neo4j.Config) {
+		config.SocketKeepalive = keepalive
+	}
 }

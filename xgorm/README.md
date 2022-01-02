@@ -49,7 +49,7 @@
 + `func SQLiteDefaultDsn(filename string) string`
 + `func PostgresDefaultDsn(username, password, host string, port int, database string) string`
 + `func IsMySQLDuplicateEntryError(err error) bool`
-+ `func IsSQLiteUniqueConstraintError(err error) bool // cgo`
++ `func IsSQLiteUniqueConstraintError(err error) bool` (cgo)
 + `func IsPostgreSQLUniqueViolationError(err error) bool`
 + `func QueryErr(rdb *gorm.DB) (xstatus.DbStatus, error)`
 + `func CreateErr(rdb *gorm.DB) (xstatus.DbStatus, error)`

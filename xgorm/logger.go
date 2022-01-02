@@ -20,7 +20,7 @@ type loggerOptions struct {
 	logOther bool
 }
 
-// LoggerOption represents an option type for LogrusLogger's option and StdLogger's option, can be created by WithXXX functions.
+// LoggerOption represents an option type for LogrusLogger and StdLogger's option, can be created by WithXXX functions.
 type LoggerOption func(*loggerOptions)
 
 // WithLogInfo creates a LoggerOption to decide whether to do log for [INFO] or not, defaults to true.

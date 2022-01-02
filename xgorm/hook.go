@@ -29,29 +29,29 @@ func HookDeletedAt(db *gorm.DB, deletedAtTimestamp string) *gorm.DB {
 	// query
 	db.Callback().Query().
 		Before("gorm:query").
-		Register("new_deleted_at_before_query_callback", deletedAtQueryUpdateCallback(deletedAtTimestamp))
+		Register("new_deleted_at_before_query_callback", hookedQueryUpdateCallback(deletedAtTimestamp))
 
 	// row query
 	db.Callback().RowQuery().
 		Before("gorm:row_query").
-		Register("new_deleted_at_before_row_query_callback", deletedAtQueryUpdateCallback(deletedAtTimestamp))
+		Register("new_deleted_at_before_row_query_callback", hookedQueryUpdateCallback(deletedAtTimestamp))
 
 	// update
 	db.Callback().Update().
 		Before("gorm:update").
-		Register("new_deleted_at_before_update_callback", deletedAtQueryUpdateCallback(deletedAtTimestamp))
+		Register("new_deleted_at_before_update_callback", hookedQueryUpdateCallback(deletedAtTimestamp))
 
 	// delete <<<
 	db.Callback().Delete().
-		Replace("gorm:delete", deletedAtDeleteCallback(deletedAtTimestamp))
+		Replace("gorm:delete", hookedDeleteCallback(deletedAtTimestamp))
 
 	return db
 }
 
 const deletedAtFieldName = "DeletedAt"
 
-// deletedAtQueryUpdateCallback is a callback for query, row_query and update, used in HookDeletedAt, referred from https://qiita.com/touyu/items/f1ac43b186cd6b26b8c7.
-func deletedAtQueryUpdateCallback(deletedAtTimestamp string) func(scope *gorm.Scope) {
+// hookedQueryUpdateCallback is a callback for query, row_query and update, used in HookDeletedAt, referred from https://qiita.com/touyu/items/f1ac43b186cd6b26b8c7.
+func hookedQueryUpdateCallback(deletedAtTimestamp string) func(scope *gorm.Scope) {
 	return func(scope *gorm.Scope) {
 		var (
 			quotedTableName     = scope.QuotedTableName()
@@ -66,7 +66,7 @@ func deletedAtQueryUpdateCallback(deletedAtTimestamp string) func(scope *gorm.Sc
 	}
 }
 
-// addExtraSpaceIfNotBlank is a string util function used in deletedAtDeleteCallback.
+// addExtraSpaceIfNotBlank is a string utility function used in hookedDeleteCallback.
 func addExtraSpaceIfNotBlank(s string) string {
 	if s != "" {
 		return " " + s
@@ -74,8 +74,8 @@ func addExtraSpaceIfNotBlank(s string) string {
 	return ""
 }
 
-// deletedAtDeleteCallback is a callback for gorm:delete used in HookDeletedAt, referred from https://github.com/jinzhu/gorm/blob/master/callback_delete.go.
-func deletedAtDeleteCallback(deletedAtTimestamp string) func(scope *gorm.Scope) {
+// hookedDeleteCallback is a callback for gorm:delete used in HookDeletedAt, referred from https://github.com/jinzhu/gorm/blob/master/callback_delete.go.
+func hookedDeleteCallback(deletedAtTimestamp string) func(scope *gorm.Scope) {
 	return func(scope *gorm.Scope) {
 		var extraOption string
 		if str, ok := scope.Get("gorm:delete_option"); ok {

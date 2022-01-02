@@ -6,7 +6,7 @@
 [![License](http://img.shields.io/badge/license-mit-blue.svg)](./LICENSE)
 [![Release](https://img.shields.io/github/v/release/Aoi-hosizora/ahlib-db)](https://github.com/Aoi-hosizora/ahlib-db/releases)
 
-+ A personal golang library for db development, including gorm (mysql, sqlite, postgresql), redis (go-redis), neo4j (neo4j-go-driver), require `Go >= 1.15`.
++ A personal golang library for db development, including gorm (mysql, sqlite, postgresql), redis (go-redis), neo4j (neo4j-go-driver/v1), require `Go >= 1.15`.
 
 ### Related libraries
 
@@ -23,12 +23,26 @@
 
 ### Dependencies
 
-+ See [go.mod](./go.mod) and [go.sum](./go.sum)
+#### xgorm
+
++ See [go.mod](./xgorm/go.mod) and [go.sum](./xgorm/go.sum)
 + `github.com/Aoi-hosizora/ahlib v1.6.0`
-+ `github.com/jinzhu/gorm v1.9.15`
++ `github.com/jinzhu/gorm v1.9.16`
 + `github.com/go-sql-driver/mysql v1.5.0`
 + `github.com/mattn/go-sqlite3 v1.14.0`
 + `github.com/lib/pq v1.1.1`
-+ `github.com/go-redis/redis/v8 v8.4.11`
++ `github.com/sirupsen/logrus v1.8.1`
+
+#### xneo4j
+
++ See [go.mod](./xneo4j/go.mod) and [go.sum](./xneo4j/go.sum)
++ `github.com/Aoi-hosizora/ahlib v1.6.0`
 + `github.com/neo4j/neo4j-go-driver v1.8.3`
++ `github.com/sirupsen/logrus v1.8.1`
+
+#### xredis
+
++ See [go.mod](./xredis/go.mod) and [go.sum](./xredis/go.sum)
++ `github.com/Aoi-hosizora/ahlib v1.6.0`
++ `github.com/go-redis/redis/v8 v8.4.11`
 + `github.com/sirupsen/logrus v1.8.1`

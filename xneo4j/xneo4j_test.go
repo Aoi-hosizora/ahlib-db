@@ -12,7 +12,7 @@ import (
 
 const (
 	neo4jParam      = "bolt://localhost:7687"
-	neo4jWrongParam = "bolt://localhost:7688"
+	neo4jWrongParam = "bolt://localhost:9999"
 	neo4jUser       = "neo4j"
 	neo4jPasswd     = "123"
 )
@@ -25,12 +25,8 @@ func TestPool(t *testing.T) {
 	}
 	l := logrus.New()
 	l.SetFormatter(&logrus.TextFormatter{ForceColors: true, FullTimestamp: true, TimestampFormat: time.RFC3339})
-	pool := NewPool(driver, func(driver neo4j.Driver, accessMode neo4j.AccessMode, bookmarks ...string) (neo4j.Session, error) {
-		session, err := driver.NewSession(neo4j.SessionConfig{
-			AccessMode:   accessMode,
-			Bookmarks:    bookmarks,
-			DatabaseName: "",
-		})
+	pool := NewPool(driver, func(driver neo4j.Driver, config *neo4j.SessionConfig) (neo4j.Session, error) {
+		session, err := driver.NewSession(*config)
 		if err != nil {
 			return nil, err
 		}

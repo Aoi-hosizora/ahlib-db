@@ -6,7 +6,6 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/sirupsen/logrus"
 	"log"
-	"os"
 	"testing"
 	"time"
 )
@@ -124,10 +123,10 @@ func TestLogger(t *testing.T) {
 		logger redis.Hook
 	}{
 		{"default", nil},
-		{"logrus", NewLogrusLogger(l1)},
+		{"logrus", NewLogrusLogger(l1, WithSkip(4))},
 		{"logrus_no_err", NewLogrusLogger(l1, WithLogErr(false))},
 		{"logrus_no_cmd", NewLogrusLogger(l1, WithLogCmd(false))},
-		{"logger", NewStdLogger(l2)},
+		{"logger", NewStdLogger(l2, WithSkip(4))},
 		{"logger_no_xxx", NewStdLogger(l2, WithLogErr(false), WithLogCmd(false))},
 		{"disable", NewLogrusLogger(l1)},
 	} {

@@ -13,6 +13,7 @@
 + `type P map`
 + `type PropertyValue struct`
 + `type PropertyDict map`
++ `type DriverOption func`
 + `type DialHandler func`
 + `type Pool struct`
 + `type LoggerOption func`
@@ -25,12 +26,11 @@
 
 ### Constants
 
-+ None
++ `const DefaultDatabase string`
 
 ### Functions
 
 + `func Collect(result neo4j.Result, err error) ([]neo4j.Record, neo4j.ResultSummary, error)`
-+ `func WithEncrypted(encrypted bool) func(*neo4j.Config)`
 + `func GetInteger(data interface{}) int64`
 + `func GetFloat(data interface{}) float64`
 + `func GetString(data interface{}) string`
@@ -50,6 +50,16 @@
 + `func GetDuration(data interface{}) neo4j.Duration`
 + `func NewPropertyValue(reverse bool, destinations ...string) *PropertyValue`
 + `func GenerateOrderByExp(source string, dict PropertyDict) string`
++ `func WithEncrypted(encrypted bool) DriverOption`
++ `func WithTrustStrategy(e neo4j.TrustStrategy) DriverOption`
++ `func WithLog(l neo4j.Logging) DriverOption`
++ `func WithAddressResolver(resolver neo4j.ServerAddressResolver) DriverOption`
++ `func WithMaxTransactionRetryTime(t time.Duration) DriverOption`
++ `func WithMaxConnectionPoolSize(size int) DriverOption`
++ `func WithMaxConnectionLifetime(t time.Duration) DriverOption`
++ `func WithConnectionAcquisitionTimeout(t time.Duration) DriverOption`
++ `func WithSocketConnectTimeout(t time.Duration) DriverOption`
++ `func WithSocketKeepalive(keepalive bool) DriverOption`
 + `func NewPool(driver neo4j.Driver, dial DialHandler) *Pool`
 + `func WithLogErr(log bool) LoggerOption`
 + `func WithLogCypher(log bool) LoggerOption`
@@ -65,6 +75,8 @@
 + `func (p *PropertyValue) Destinations() []string`
 + `func (p *PropertyValue) Reverse() bool`
 + `func (p *Pool) Dial(mode neo4j.AccessMode, bookmarks ...string) (neo4j.Session, error)`
++ `func (p *Pool) NewSession(config neo4j.SessionConfig) (neo4j.Session, error)`
++ `func (p *Pool) Session(mode neo4j.AccessMode, bookmarks ...string) (neo4j.Session, error)`
 + `func (p *Pool) DialReadMode(bookmarks ...string) (neo4j.Session, error)`
 + `func (p *Pool) DialWriteMode(bookmarks ...string) (neo4j.Session, error)`
 + `func (p *Pool) Driver() neo4j.Driver`

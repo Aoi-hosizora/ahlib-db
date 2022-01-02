@@ -10,6 +10,10 @@ import (
 	"github.com/lib/pq"
 )
 
+// ========
+// dialects
+// ========
+
 const (
 	// MySQL is MySQL dialect for gorm, remember to import github.com/jinzhu/gorm/dialects/mysql or github.com/go-sql-driver/mysql.
 	MySQL = "mysql"
@@ -82,6 +86,10 @@ func IsPostgreSQLUniqueViolationError(err error) bool {
 	return ok && postgresErr.Code == PostgreSQLUniqueViolationErrno
 }
 
+// ==============
+// CRUD and other
+// ==============
+
 // QueryErr checks gorm.DB after query operated, will only return xstatus.DbSuccess, xstatus.DbNotFound and xstatus.DbFailed.
 func QueryErr(rdb *gorm.DB) (xstatus.DbStatus, error) {
 	switch {
@@ -128,7 +136,8 @@ func NewPropertyValue(reverse bool, destinations ...string) *PropertyValue {
 // 		"name": NewPropertyValue(false, "firstname", "lastname"),
 // 		"age":  NewPropertyValue(true, "birthday"),
 // 	}
-// 	r := GenerateOrderByExp(`age,username desc`, dict) // => birthday DESC, firstname DESC, lastname DESC
+// 	_ = GenerateOrderByExp(`uid, age desc`, dict) // => uid ASC, birthday ASC
+// 	_ = GenerateOrderByExp(`age, username desc`, dict) // => birthday DESC, firstname DESC, lastname DESC
 func GenerateOrderByExp(source string, dict PropertyDict) string {
 	return internal.GenerateOrderByExp(source, dict)
 }

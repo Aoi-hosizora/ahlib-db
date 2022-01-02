@@ -22,7 +22,7 @@ type loggerOptions struct {
 	skip         int
 }
 
-// LoggerOption represents an option type for LogrusLogger's option and StdLogger's option, can be created by WithXXX functions.
+// LoggerOption represents an option type for LogrusLogger and StdLogger's option, can be created by WithXXX functions.
 type LoggerOption func(*loggerOptions)
 
 // WithLogErr creates a LoggerOption to decide whether to do log for errors or not, defaults to true.
