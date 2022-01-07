@@ -24,10 +24,12 @@
 + `type SilenceLogger struct`
 + `type LogrusLogger struct`
 + `type StdLogger struct`
++ `type LoggerParam struct`
 
 ### Variables
 
-+ None
++ `var FormatLoggerFunc func`
++ `var FieldifyLoggerFunc func`
 
 ### Constants
 
@@ -72,4 +74,4 @@
 + `func (p *PropertyValue) Reverse() bool`
 + `func (s *SilenceLogger) Print(...interface{})`
 + `func (l *LogrusLogger) Print(v ...interface{})`
-+ `func (s *StdLogger) Print(v ...interface{})`
++ `func (l *StdLogger) Print(v ...interface{})`

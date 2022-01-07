@@ -4,10 +4,17 @@
 package xgorm
 
 import (
+	"github.com/Aoi-hosizora/ahlib/xtesting"
 	_ "github.com/jinzhu/gorm/dialects/mysql"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
+	"github.com/mattn/go-sqlite3"
 	"testing"
 )
+
+func TestMess2(t *testing.T) {
+	xtesting.True(t, IsSQLiteUniqueConstraintError(sqlite3.Error{ExtendedCode: SQLiteUniqueConstraintErrno}))
+	xtesting.True(t, IsSQLiteUniqueConstraintError(&sqlite3.Error{ExtendedCode: SQLiteUniqueConstraintErrno}))
+}
 
 func TestHook(t *testing.T) {
 	for _, tc := range []struct {

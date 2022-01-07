@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
-	"sync"
+	"sync/atomic"
 	"time"
 	"unicode"
 )
@@ -44,27 +44,26 @@ func WithLogOther(log bool) LoggerOption {
 	}
 }
 
-var (
-	// _enable is a global flag to control behaviors of LogrusLogger and StdLogger.
-	_enable = true
+// _enable is a global flag to control behaviors of LogrusLogger and StdLogger, initials to true.
+var _enable atomic.Value
 
-	// _enableMu locks _enable.
-	_enableMu sync.RWMutex
-)
+func init() {
+	_enable.Store(true)
+}
 
 // EnableLogger enables LogrusLogger and StdLogger to do any log.
 func EnableLogger() {
-	_enableMu.Lock()
-	_enable = true
-	_enableMu.Unlock()
+	_enable.Store(true)
 }
 
 // DisableLogger disables LogrusLogger and StdLogger.
 func DisableLogger() {
-	_enableMu.Lock()
-	_enable = false
-	_enableMu.Unlock()
+	_enable.Store(false)
 }
+
+// =====
+// types
+// =====
 
 // ILogger abstracts gorm's internal logger to an interface, equals to gorm.logger interface.
 type ILogger interface {
@@ -140,89 +139,136 @@ func NewStdLogger(logger logrus.StdLogger, options ...LoggerOption) *StdLogger {
 
 // Print implements gorm.logger interface, it logs gorm's message to logrus.Logger.
 func (l *LogrusLogger) Print(v ...interface{}) {
-	_enableMu.RLock()
-	enable := _enable
-	_enableMu.RUnlock()
+	enable := _enable.Load().(bool)
 	if !enable || len(v) <= 1 {
 		return // ignore
 	}
 
 	// [INFO] or [SQL] or [LOG] or ...
-	m, f := extractLoggerData(v, l.option)
-	if m != "" {
-		l.logger.WithFields(f).Info(m)
+	p := extractLoggerParam(v)
+	switch {
+	case p == nil,
+		p.Type == "info" && !l.option.logInfo,
+		p.Type == "sql" && !l.option.logSQL,
+		!l.option.logOther:
+		return
 	}
+	m := formatLoggerParam(p)
+	f := fieldifyLoggerParam(p)
+	l.logger.WithFields(f).Info(m)
 }
 
 // Print implements gorm.logger interface, it logs gorm's message to logrus.StdLogger.
-func (s *StdLogger) Print(v ...interface{}) {
-	_enableMu.RLock()
-	enable := _enable
-	_enableMu.RUnlock()
+func (l *StdLogger) Print(v ...interface{}) {
+	enable := _enable.Load().(bool)
 	if !enable || len(v) <= 1 {
 		return // ignore
 	}
 
 	// [INFO] or [SQL] or [LOG] or ...
-	m, _ := extractLoggerData(v, s.option)
-	if m != "" {
-		s.logger.Print(m)
+	p := extractLoggerParam(v)
+	switch {
+	case p == nil,
+		p.Type == "info" && !l.option.logInfo,
+		p.Type == "sql" && !l.option.logSQL,
+		!l.option.logOther:
+		return
+	}
+	m := formatLoggerParam(p)
+	l.logger.Print(m)
+}
+
+// =======
+// extract
+// =======
+
+// LoggerParam stores some logger parameters and is used by LogrusLogger and StdLogger.
+type LoggerParam struct {
+	Type     string
+	Message  string
+	SQL      string
+	Rows     int64
+	Duration time.Duration
+	Source   string
+}
+
+var (
+	// FormatLoggerFunc is a custom LoggerParam's format function for LogrusLogger and StdLogger.
+	FormatLoggerFunc func(p *LoggerParam) string
+
+	// FieldifyLoggerFunc is a custom LoggerParam's fieldify function for LogrusLogger.
+	FieldifyLoggerFunc func(p *LoggerParam) logrus.Fields
+)
+
+// extractLoggerParam extracts and returns LoggerParam using given parameters.
+func extractLoggerParam(v []interface{}) *LoggerParam {
+	switch {
+	case len(v) <= 1:
+		return nil // unreachable
+	case len(v) == 2: // [INFO], ...
+		return &LoggerParam{Type: v[0].(string), Message: fmt.Sprintf("%v", v[1])}
+	case v[0] != "sql": // [LOG], ...
+		return &LoggerParam{Type: v[0].(string), Message: fmt.Sprintf("[%s] %v", v[0], fmt.Sprint(v[2:]...))}
+	default: // [SQL]
+		source := v[1].(string)
+		duration := v[2].(time.Duration)
+		sql := render(v[3].(string), v[4].([]interface{}))
+		rows := v[5].(int64)
+		return &LoggerParam{
+			Type:     v[0].(string),
+			SQL:      sql,
+			Rows:     rows,
+			Duration: duration,
+			Source:   source,
+		}
+	}
+}
+
+// formatLoggerParam formats given LoggerParam to string for LogrusLogger and StdLogger.
+//
+// The default format logs like:
+// 	[Gorm] [info] registering callback `new_deleted_at_before_query_callback` from F:/Projects/ahlib-db/xgorm/hook.go:36
+// 	[Gorm] [log] Error 1062: Duplicate entry '1' for key 'PRIMARY'
+// 	[Gorm]       1 |     1.9957ms | SELECT * FROM `tbl_test`   ORDER BY `tbl_test`.`id` ASC LIMIT 1 | F:/Projects/ahlib-db/xgorm/xgorm_test.go:48
+// 	      |-------| |------------| |---------------------------------------------------------------| |-------------------------------------------|
+// 	          7           12                                      ...                                                       ...
+func formatLoggerParam(p *LoggerParam) string {
+	if FormatLoggerFunc != nil {
+		return FormatLoggerFunc(p)
+	}
+	if p.Type != "sql" {
+		return fmt.Sprintf("[Gorm] %s", p.Message)
+	}
+	return fmt.Sprintf("[Gorm] %7d | %12s | %s | %s", p.Rows, p.Duration.String(), p.SQL, p.Source)
+}
+
+// fieldifyLoggerParam fieldifies given LoggerParam to logrus.Fields for LogrusLogger.
+//
+// The default contains the following fields: module, type, message, sql, rows, duration, source.
+func fieldifyLoggerParam(p *LoggerParam) logrus.Fields {
+	if FieldifyLoggerFunc != nil {
+		return FieldifyLoggerFunc(p)
+	}
+	if p.Type != "sql" {
+		return logrus.Fields{
+			"module":  "gorm",
+			"type":    p.Type, // info / log / ...
+			"message": p.Message,
+		}
+	}
+	return logrus.Fields{
+		"module":   "gorm",
+		"type":     p.Type, // sql
+		"sql":      p.SQL,
+		"rows":     p.Rows,
+		"duration": p.Duration,
+		"source":   p.Source,
 	}
 }
 
 // ========
 // internal
 // ========
-
-// extractLoggerData extracts and formats given values to logger message and logrus.Fields, see gorm.LogFormatter for more details.
-//
-// Logs like:
-// 	[Gorm] [info] registering callback `new_deleted_at_before_query_callback` from F:/Projects/ahlib-db/xgorm/hook.go:36
-// 	[Gorm] [log] Error 1062: Duplicate entry '1' for key 'PRIMARY'
-// 	[Gorm]       1 |     1.9957ms | SELECT * FROM `tbl_test`   ORDER BY `tbl_test`.`id` ASC LIMIT 1 | F:/Projects/ahlib-db/xgorm/xgorm_test.go:48
-// 	      |-------| |------------| |---------------------------------------------------------------| |-------------------------------------------|
-// 	          7           12                                      ...                                                       ...
-func extractLoggerData(v []interface{}, option *loggerOptions) (string, logrus.Fields) {
-	var msg string
-	var fields logrus.Fields
-
-	if len(v) == 2 {
-		// [INFO]
-		if !option.logInfo {
-			return "", nil
-		}
-		msg = fmt.Sprintf("[Gorm] %v", v[1])
-		fields = logrus.Fields{"module": "gorm", "type": v[0], "info": v[1]}
-	} else if v[0] != "sql" {
-		// [LOG], other ...
-		if !option.logOther {
-			return "", nil
-		}
-		s := fmt.Sprint(v[2:]...)
-		msg = fmt.Sprintf("[Gorm] [%v] %v", v[0], s)
-		fields = logrus.Fields{"module": "gorm", "type": v[0], "message": s}
-	} else {
-		// [SQL]
-		if !option.logSQL {
-			return "", nil
-		}
-		source := v[1]
-		duration := v[2].(time.Duration)
-		sql := render(v[3].(string), v[4].([]interface{}))
-		rows := v[5].(int64)
-		msg = fmt.Sprintf("[Gorm] %7d | %12s | %s | %s", rows, duration, sql, source)
-		fields = logrus.Fields{
-			"module":   "gorm",
-			"type":     "sql",
-			"sql":      sql,
-			"rows":     rows,
-			"duration": duration,
-			"source":   source,
-		}
-	}
-
-	return msg, fields
-}
 
 // isPrintable is a string utility function used in render.
 func isPrintable(s string) bool {

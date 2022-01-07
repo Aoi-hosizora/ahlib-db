@@ -10,7 +10,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
-	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -53,27 +53,26 @@ func WithSkip(skip int) LoggerOption {
 	}
 }
 
-var (
-	// _enable is a global flag to control behaviors of LogrusLogger and StdLogger.
-	_enable = true
+// _enable is a global flag to control behaviors of LogrusLogger and StdLogger, initials to true.
+var _enable atomic.Value
 
-	// _enableMu locks _enable.
-	_enableMu sync.RWMutex
-)
+func init() {
+	_enable.Store(true)
+}
 
 // EnableLogger enables LogrusLogger and StdLogger to do any log.
 func EnableLogger() {
-	_enableMu.Lock()
-	_enable = true
-	_enableMu.Unlock()
+	_enable.Store(true)
 }
 
 // DisableLogger disables LogrusLogger and StdLogger.
 func DisableLogger() {
-	_enableMu.Lock()
-	_enable = false
-	_enableMu.Unlock()
+	_enable.Store(false)
 }
+
+// =====
+// types
+// =====
 
 // LogrusLogger represents a neo4j.Session as neo4j's logger, used to log neo4j's executing message to logrus.Logger.
 type LogrusLogger struct {
@@ -131,111 +130,168 @@ func NewStdLogger(session neo4j.Session, logger logrus.StdLogger, options ...Log
 // Run implements neo4j.Session interface, it executes given cypher and params, and logs neo4j's message to logrus.Logger.
 func (l *LogrusLogger) Run(cypher string, params map[string]interface{}, configurers ...func(*neo4j.TransactionConfig)) (neo4j.Result, error) {
 	result, err := l.Session.Run(cypher, params, configurers...)
-	_enableMu.RLock()
-	enable := _enable
-	_enableMu.RUnlock()
+	enable := _enable.Load().(bool)
 	if !enable {
 		return result, err // ignore
 	}
 
 	_, file, line, _ := runtime.Caller(l.option.skip) // defaults to 4
 	source := fmt.Sprintf("%s:%d", file, line)
-	m, f, isErr := extractLoggerData(result, err, source, l.option)
-	if isErr && l.option.logErr {
+
+	p := extractLoggerParam(result, err, source, l.option.counterField)
+	m := formatLoggerParam(p)
+	f := fieldifyLoggerParam(p)
+	if p.ErrorMsg != "" && l.option.logErr {
 		l.logger.WithFields(f).Error(m)
-	} else if !isErr && l.option.logCypher {
+	} else if p.ErrorMsg == "" && l.option.logCypher {
 		l.logger.WithFields(f).Info(m)
 	}
-
 	return result, err
 }
 
 // Run implements neo4j.Session interface, it executes given cypher and params, and logs neo4j's message to logrus.StdLogger.
-func (s *StdLogger) Run(cypher string, params map[string]interface{}, configurers ...func(*neo4j.TransactionConfig)) (neo4j.Result, error) {
-	result, err := s.Session.Run(cypher, params, configurers...)
-	_enableMu.RLock()
-	enable := _enable
-	_enableMu.RUnlock()
+func (l *StdLogger) Run(cypher string, params map[string]interface{}, configurers ...func(*neo4j.TransactionConfig)) (neo4j.Result, error) {
+	result, err := l.Session.Run(cypher, params, configurers...)
+	enable := _enable.Load().(bool)
 	if !enable {
 		return result, err // ignore
 	}
 
-	_, file, line, _ := runtime.Caller(s.option.skip) // defaults to 4
+	_, file, line, _ := runtime.Caller(l.option.skip) // defaults to 4
 	source := fmt.Sprintf("%s:%d", file, line)
-	m, _, isErr := extractLoggerData(result, err, source, s.option)
-	if (isErr && s.option.logErr) || (!isErr && s.option.logCypher) {
-		s.logger.Print(m)
-	}
 
+	p := extractLoggerParam(result, err, source, l.option.counterField)
+	m := formatLoggerParam(p)
+	if (p.ErrorMsg != "" && l.option.logErr) || (p.ErrorMsg == "" && l.option.logCypher) {
+		l.logger.Print(m)
+	}
 	return result, err
 }
 
-// ========
-// internal
-// ========
+// =======
+// extract
+// =======
 
-// extractLoggerData extracts and formats given neo4j.Result, error and source string to logger message and logrus.Fields.
-//
-// Logs like:
-// 	[Neo4j] Connection error: dial tcp [::1]:7687: connectex: No connection could be made because the target machine actively refused it. | F:/Projects/ahlib-db/xneo4j/xneo4j_test.go:97
-// 	[Neo4j] Server error: [Neo.ClientError.Statement.SyntaxError] Invalid input 'n' (line 1, column 26 (offset: 25)) | F:/Projects/ahlib-db/xneo4j/xneo4j_test.go:97
-// 	[Neo4j]     -1 |        999ms | MATCH (n {uid: 8}) RETURN n LIMIT 1 | F:/Projects/ahlib-db/xneo4j/xneo4j_test.go:97
-// 	       |------| |------------| |-----------------------------------| |---------------------------------------------|
-// 	          6           12                        ...                                          ...
-func extractLoggerData(result neo4j.Result, err error, source string, options *loggerOptions) (string, logrus.Fields, bool) {
-	var msg string
-	var fields logrus.Fields
-	var isErr bool
+// LoggerParam stores some logger parameters and is used by LogrusLogger and StdLogger.
+type LoggerParam struct {
+	Type     string
+	Cypher   string
+	Duration time.Duration
+	Source   string
+	Counter  neo4j.Counters
+	ErrorMsg string
+}
 
+var (
+	// FormatLoggerFunc is a custom LoggerParam's format function for LogrusLogger and StdLogger.
+	FormatLoggerFunc func(p *LoggerParam) string
+
+	// FieldifyLoggerFunc is a custom LoggerParam's fieldify function for LogrusLogger.
+	FieldifyLoggerFunc func(p *LoggerParam) logrus.Fields
+)
+
+// extractLoggerParam extracts and returns LoggerParam using given parameters.
+func extractLoggerParam(result neo4j.Result, err error, source string, needCounter bool) *LoggerParam {
 	if err != nil {
 		// failed to connect (Connection error)
 		// the target machine actively refused it
 		// ...
-		isErr = true
-		msg = fmt.Sprintf("[Neo4j] %v | %s", err, source)
-		fields = logrus.Fields{"module": "neo4j", "type": "connection", "error": err, "source": source}
-	} else if summary, err := result.Summary(); err != nil {
+		return &LoggerParam{Type: "connection", ErrorMsg: err.Error(), Source: source}
+	}
+
+	summary, err := result.Summary()
+	if err != nil {
 		// failed to execute (Server error)
 		// Neo.ClientError.Security.Unauthorized
 		// Neo.ClientError.Statement.SyntaxError
 		// Neo.ClientError.Statement.TypeError
 		// Neo.ClientError.Schema.ConstraintValidationFailed
 		// ...
-		isErr = true
-		msg = fmt.Sprintf("[Neo4j] %v | %s", err, source)
-		fields = logrus.Fields{"module": "neo4j", "type": "server", "error": err, "source": source}
-	} else {
-		stat := summary.Statement()
-		cypher := render(stat.Text(), stat.Params())
-		du := summary.ResultAvailableAfter() + summary.ResultConsumedAfter()
-		msg = fmt.Sprintf("[Neo4j] %6d | %12s | %s | %s", -1 /* <<< */, du, cypher, source)
-		fields = logrus.Fields{
-			"module":   "neo4j",
-			"type":     "cypher",
-			"cypher":   cypher,
-			"rows":     -1, // unable to get rows, because this behavior will consume the iterator
-			"duration": du,
-			"source":   source,
+		lines := make([]string, 0, 2)
+		for _, m := range strings.Split(strings.ReplaceAll(err.Error(), "^", ""), "\n") {
+			m = strings.TrimSpace(xstring.RemoveBlanks(m))
+			if len(m) > 0 {
+				lines = append(lines, m)
+			}
 		}
-		if options.counterField {
-			// also contains counter statistics
-			counters := summary.Counters()
-			fields["nodesCreated"] = counters.NodesCreated()
-			fields["nodesDeleted"] = counters.NodesDeleted()
-			fields["relationshipsCreated"] = counters.RelationshipsCreated()
-			fields["relationshipsDeleted"] = counters.RelationshipsDeleted()
-			fields["propertiesSet"] = counters.PropertiesSet()
-			fields["labelsAdded"] = counters.LabelsAdded()
-			fields["labelsRemoved"] = counters.LabelsRemoved()
-			fields["indexesAdded"] = counters.IndexesAdded()
-			fields["indexesRemoved"] = counters.IndexesRemoved()
-			fields["constraintsAdded"] = counters.ConstraintsAdded()
-			fields["constraintsRemoved"] = counters.ConstraintsRemoved()
-		}
+		errMsg := strings.Join(lines, "; ")
+		return &LoggerParam{Type: "Server", ErrorMsg: errMsg, Source: source}
 	}
 
-	return msg, fields, isErr
+	stat := summary.Statement()
+	cypher := render(stat.Text(), stat.Params())
+	du := summary.ResultAvailableAfter() + summary.ResultConsumedAfter()
+	p := &LoggerParam{
+		Type:     "Cypher",
+		Cypher:   cypher,
+		Duration: du,
+		Source:   source,
+	}
+	if needCounter {
+		p.Counter = summary.Counters()
+	}
+	return p
 }
+
+// formatLoggerParam formats given LoggerParam to string for LogrusLogger and StdLogger.
+//
+// The default format logs like:
+// 	[Neo4j] Connection error: dial tcp [::1]:7687: connectex: No connection could be made because the target machine actively refused it. | F:/Projects/ahlib-db/xneo4j/xneo4j_test.go:97
+// 	[Neo4j] Server error: [Neo.ClientError.Statement.SyntaxError] Invalid input 'n' (line 1, column 26 (offset: 25)) | F:/Projects/ahlib-db/xneo4j/xneo4j_test.go:97
+// 	[Neo4j]     -1 |        999ms | MATCH (n {uid: 8}) RETURN n LIMIT 1 | F:/Projects/ahlib-db/xneo4j/xneo4j_test.go:97
+// 	       |------| |------------| |-----------------------------------| |---------------------------------------------|
+// 	          6           12                        ...                                          ...
+func formatLoggerParam(p *LoggerParam) string {
+	if FormatLoggerFunc != nil {
+		return FormatLoggerFunc(p)
+	}
+	if p.ErrorMsg != "" {
+		return fmt.Sprintf("[Neo4j] %v | %s", p.ErrorMsg, p.Source)
+	}
+	return fmt.Sprintf("[Neo4j] %6d | %12s | %s | %s", -1, p.Duration.String(), p.Cypher, p.Source)
+}
+
+// fieldifyLoggerParam fieldifies given LoggerParam to logrus.Fields for LogrusLogger.
+//
+// The default contains the following fields: module, type, cypher, duration, source, error, and counter fields.
+func fieldifyLoggerParam(p *LoggerParam) logrus.Fields {
+	if FieldifyLoggerFunc != nil {
+		return FieldifyLoggerFunc(p)
+	}
+	if p.ErrorMsg != "" {
+		return logrus.Fields{
+			"module": "neo4j",
+			"type":   p.Type, // connection / server
+			"error":  p.ErrorMsg,
+			"source": p.Source,
+		}
+	}
+	f := logrus.Fields{
+		"module":   "neo4j",
+		"type":     p.Type, // cypher
+		"cypher":   p.Cypher,
+		"duration": p.Duration,
+		"source":   p.Source,
+	}
+	if p.Counter != nil {
+		f["nodesCreated"] = p.Counter.NodesCreated()
+		f["nodesDeleted"] = p.Counter.NodesDeleted()
+		f["relationshipsCreated"] = p.Counter.RelationshipsCreated()
+		f["relationshipsDeleted"] = p.Counter.RelationshipsDeleted()
+		f["propertiesSet"] = p.Counter.PropertiesSet()
+		f["labelsAdded"] = p.Counter.LabelsAdded()
+		f["labelsRemoved"] = p.Counter.LabelsRemoved()
+		f["indexesAdded"] = p.Counter.IndexesAdded()
+		f["indexesRemoved"] = p.Counter.IndexesRemoved()
+		f["constraintsAdded"] = p.Counter.ConstraintsAdded()
+		f["constraintsRemoved"] = p.Counter.ConstraintsRemoved()
+	}
+	return f
+}
+
+// ========
+// internal
+// ========
 
 // render renders given cypher string and parameters to form the cypher expression.
 func render(cypher string, params map[string]interface{}) string {

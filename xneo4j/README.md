@@ -19,10 +19,12 @@
 + `type LoggerOption func`
 + `type LogrusLogger struct`
 + `type StdLogger struct`
++ `type LoggerParam struct`
 
 ### Variables
 
-+ None
++ `var FormatLoggerFunc func`
++ `var FieldifyLoggerFunc func`
 
 ### Constants
 
@@ -84,4 +86,4 @@
 + `func (p *Pool) VerifyConnectivity() error`
 + `func (p *Pool) Close() error`
 + `func (l *LogrusLogger) Run(cypher string, params map[string]interface{}, configurers ...func(*neo4j.TransactionConfig)) (neo4j.Result, error)`
-+ `func (s *StdLogger) Run(cypher string, params map[string]interface{}, configurers ...func(*neo4j.TransactionConfig)) (neo4j.Result, error)`
++ `func (l *StdLogger) Run(cypher string, params map[string]interface{}, configurers ...func(*neo4j.TransactionConfig)) (neo4j.Result, error)`

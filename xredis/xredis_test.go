@@ -2,6 +2,7 @@ package xredis
 
 import (
 	"context"
+	"fmt"
 	"github.com/Aoi-hosizora/ahlib/xtesting"
 	"github.com/go-redis/redis/v8"
 	"github.com/sirupsen/logrus"
@@ -18,99 +19,66 @@ const (
 )
 
 func TestHelper(t *testing.T) {
-	for _, tc := range []struct {
-		giveAddr   string
-		givePasswd string
-		wantErr    bool
-	}{
-		{redisAddr, redisPasswd, false},
-		{redisAddr, redisFakePasswd, true},
-	} {
-		client := redis.NewClient(&redis.Options{
-			Addr:     tc.giveAddr,
-			Password: tc.givePasswd,
-			DB:       redisDB,
-		})
-		l := logrus.New()
-		l.SetFormatter(&logrus.TextFormatter{ForceColors: true, FullTimestamp: true, TimestampFormat: time.RFC3339})
-		redis.SetLogger(NewSilenceLogger())
-		client.AddHook(NewLogrusLogger(l))
+	client := redis.NewClient(&redis.Options{Addr: redisAddr, Password: redisPasswd, DB: redisDB})
+	redis.SetLogger(NewSilenceLogger())
+	l := logrus.New()
+	l.SetFormatter(&logrus.TextFormatter{ForceColors: true, FullTimestamp: true, TimestampFormat: time.RFC3339})
+	client.AddHook(NewLogrusLogger(l))
 
-		t.Run("ScanAll", func(t *testing.T) {
-			client.Set(context.Background(), "test_a", "test_aaa", 0)
-			client.Set(context.Background(), "test_b", "test_bbb", 0)
-			client.Set(context.Background(), "test_c", "test_ccc", 0)
-			defer client.Del(context.Background(), "test_a", "test_b", "test_c")
+	t.Run("ScanAll", func(t *testing.T) {
+		client.Set(context.Background(), "test_a", "test_aaa", 0)
+		client.Set(context.Background(), "test_b", "test_bbb", 0)
+		client.Set(context.Background(), "test_c", "test_ccc", 0)
+		defer client.Del(context.Background(), "test_a", "test_b", "test_c")
 
-			keys, err := ScanAll(context.Background(), client, "test_*", 20)
-			if tc.wantErr {
-				xtesting.NotNil(t, err)
-			} else {
-				xtesting.ElementMatch(t, keys, []string{"test_a", "test_b", "test_c"})
-				xtesting.Nil(t, err)
-			}
-		})
+		keys, err := ScanAll(context.Background(), client, "test_*", 1)
+		xtesting.Nil(t, err)
+		xtesting.ElementMatch(t, keys, []string{"test_a", "test_b", "test_c"})
+	})
 
-		t.Run("DelAll", func(t *testing.T) {
-			client.Set(context.Background(), "test_a", "test_aaa", 0)
-			client.Set(context.Background(), "test_b", "test_bbb", 0)
-			client.Set(context.Background(), "test_c", "test_ccc", 0)
+	t.Run("DelAll", func(t *testing.T) {
+		client.Set(context.Background(), "test_a", "test_aaa", 0)
+		client.Set(context.Background(), "test_b", "test_bbb", 0)
+		client.Set(context.Background(), "test_c", "test_ccc", 0)
 
-			tot, err := DelAll(context.Background(), client, "test_")
-			if tc.wantErr {
-				xtesting.NotNil(t, err)
-			} else {
-				xtesting.Equal(t, tot, int64(0))
-				xtesting.Nil(t, err)
-			}
+		tot, err := DelAll(context.Background(), client, "test_")
+		xtesting.Nil(t, err)
+		xtesting.Equal(t, tot, int64(0))
+		tot, err = DelAll(context.Background(), client, "test_a")
+		xtesting.Nil(t, err)
+		xtesting.Equal(t, tot, int64(1))
+		tot, err = DelAll(context.Background(), client, "test_*")
+		xtesting.Nil(t, err)
+		xtesting.Equal(t, tot, int64(2))
+	})
 
-			tot, err = DelAll(context.Background(), client, "test_a")
-			if tc.wantErr {
-				xtesting.NotNil(t, err)
-			} else {
-				xtesting.Equal(t, tot, int64(1))
-				xtesting.Nil(t, err)
-			}
+	t.Run("DelAllByScan", func(t *testing.T) {
+		client.Set(context.Background(), "test_a", "test_aaa", 0)
+		client.Set(context.Background(), "test_b", "test_bbb", 0)
+		client.Set(context.Background(), "test_c", "test_ccc", 0)
 
-			tot, err = DelAll(context.Background(), client, "test_*")
-			if tc.wantErr {
-				xtesting.NotNil(t, err)
-			} else {
-				xtesting.Equal(t, tot, int64(2))
-				xtesting.Nil(t, err)
-			}
-		})
+		tot, err := DelAllByScan(context.Background(), client, "test_", 1)
+		xtesting.Nil(t, err)
+		xtesting.Equal(t, tot, int64(0))
+		tot, err = DelAllByScan(context.Background(), client, "test_a", 1)
+		xtesting.Nil(t, err)
+		xtesting.Equal(t, tot, int64(1))
+		tot, err = DelAllByScan(context.Background(), client, "test_*", 1)
+		xtesting.Nil(t, err)
+		xtesting.Equal(t, tot, int64(2))
+	})
 
-		t.Run("DelAllByScan", func(t *testing.T) {
-			client.Set(context.Background(), "test_a", "test_aaa", 0)
-			client.Set(context.Background(), "test_b", "test_bbb", 0)
-			client.Set(context.Background(), "test_c", "test_ccc", 0)
+	t.Run("Errors", func(t *testing.T) {
+		c := redis.NewClient(&redis.Options{Addr: redisAddr, Password: redisFakePasswd, DB: 0})
+		c.AddHook(NewLogrusLogger(l))
 
-			tot, err := DelAllByScan(context.Background(), client, "test_", 20)
-			if tc.wantErr {
-				xtesting.NotNil(t, err)
-			} else {
-				xtesting.Equal(t, tot, int64(0))
-				xtesting.Nil(t, err)
-			}
-
-			tot, err = DelAllByScan(context.Background(), client, "test_a", 20)
-			if tc.wantErr {
-				xtesting.NotNil(t, err)
-			} else {
-				xtesting.Equal(t, tot, int64(1))
-				xtesting.Nil(t, err)
-			}
-
-			tot, err = DelAllByScan(context.Background(), client, "test_*", 20)
-			if tc.wantErr {
-				xtesting.NotNil(t, err)
-			} else {
-				xtesting.Equal(t, tot, int64(2))
-				xtesting.Nil(t, err)
-			}
-		})
-	}
+		_, err := ScanAll(context.Background(), c, "test_*", 1)
+		xtesting.NotNil(t, err)
+		_, err = DelAll(context.Background(), c, "test_*")
+		xtesting.NotNil(t, err)
+		_, err = DelAllByScan(context.Background(), c, "test_*", 1)
+		xtesting.NotNil(t, err)
+	})
 }
 
 func TestLogger(t *testing.T) {
@@ -120,15 +88,22 @@ func TestLogger(t *testing.T) {
 
 	for _, tc := range []struct {
 		name   string
+		enable bool
+		custom bool
 		logger redis.Hook
 	}{
-		{"default", nil},
-		{"logrus", NewLogrusLogger(l1, WithSkip(4))},
-		{"logrus_no_err", NewLogrusLogger(l1, WithLogErr(false))},
-		{"logrus_no_cmd", NewLogrusLogger(l1, WithLogCmd(false))},
-		{"logger", NewStdLogger(l2, WithSkip(4))},
-		{"logger_no_xxx", NewStdLogger(l2, WithLogErr(false), WithLogCmd(false))},
-		{"disable", NewLogrusLogger(l1)},
+		{"default", true, false, nil},
+		//
+		{"logrus", true, false, NewLogrusLogger(l1)},
+		{"logrus_custom", true, true, NewLogrusLogger(l1)},
+		{"logrus_no_err", true, false, NewLogrusLogger(l1, WithLogErr(false))},
+		{"logrus_no_cmd", true, false, NewLogrusLogger(l1, WithLogCmd(false))},
+		{"logrus_disable", false, false, NewLogrusLogger(l1)},
+		//
+		{"stdlog", true, false, NewStdLogger(l2, WithSkip(4))},
+		{"stdlog_custom", true, true, NewStdLogger(l2, WithSkip(4))},
+		{"stdlog_no_xxx", true, false, NewStdLogger(l2, WithLogErr(false), WithLogCmd(false))},
+		{"stdlog_disable", false, false, NewStdLogger(l2)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			client := redis.NewClient(&redis.Options{
@@ -144,10 +119,25 @@ func TestLogger(t *testing.T) {
 				_ = tc.logger.AfterProcess(context.Background(), nil)
 				NewSilenceLogger().Printf(context.Background(), "")
 			}
-			if tc.name != "disable" {
+			if tc.enable {
 				EnableLogger()
 			} else {
 				DisableLogger()
+			}
+			if tc.custom {
+				FormatLoggerFunc = func(p *LoggerParam) string {
+					if p.ErrorMsg != "" {
+						return fmt.Sprintf("[Redis] err: %v - %s - %s", p.ErrorMsg, p.Command, p.Source)
+					}
+					return fmt.Sprintf("[Redis] %6s - %12s - %s - %s", p.Status, p.Duration.String(), p.Command, p.Source)
+				}
+				FieldifyLoggerFunc = func(p *LoggerParam) logrus.Fields {
+					return logrus.Fields{"module": "redis"}
+				}
+				defer func() {
+					FormatLoggerFunc = nil
+					FieldifyLoggerFunc = nil
+				}()
 			}
 
 			client.Do(context.Background(), "XXX")
@@ -196,6 +186,8 @@ func TestLogger(t *testing.T) {
 			client.SlowLogGet(context.Background(), 1)                                                // SlowLogCmd
 			client.Command(context.Background())                                                      // CommandsInfoCmd
 			client.PubSubNumSub(context.Background(), "")                                             // StringIntMapCmd
+			client.TTL(context.Background(), "test")                                                  // DurationCmd
+			client.Time(context.Background())                                                         // TimeCmd
 		})
 	}
 }

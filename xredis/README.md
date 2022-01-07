@@ -15,10 +15,12 @@
 + `type SilenceLogger struct`
 + `type LogrusLogger struct`
 + `type StdLogger struct`
++ `type LoggerParam struct`
 
 ### Variables
 
-+ None
++ `var FormatLoggerFunc func`
++ `var FieldifyLoggerFunc func`
 
 ### Constants
 
@@ -43,5 +45,5 @@
 + `func (s *SilenceLogger) Printf(context.Context, string, ...interface{})`
 + `func (l *LogrusLogger) BeforeProcess(ctx context.Context, _ redis.Cmder) (context.Context, error)`
 + `func (l *LogrusLogger) AfterProcess(ctx context.Context, cmd redis.Cmder) error`
-+ `func (s *StdLogger) BeforeProcess(ctx context.Context, _ redis.Cmder) (context.Context, error)`
-+ `func (s *StdLogger) AfterProcess(ctx context.Context, cmd redis.Cmder) error`
++ `func (l *StdLogger) BeforeProcess(ctx context.Context, _ redis.Cmder) (context.Context, error)`
++ `func (l *StdLogger) AfterProcess(ctx context.Context, cmd redis.Cmder) error`

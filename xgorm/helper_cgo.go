@@ -11,8 +11,12 @@ import (
 
 // IsSQLiteUniqueConstraintError checks if err is SQLite's ErrConstraintUnique error, its error extended code is SQLiteUniqueConstraintErrno.
 func IsSQLiteUniqueConstraintError(err error) bool {
-	sqliteErr, ok := err.(sqlite3.Error)
-	return ok && sqliteErr.ExtendedCode == SQLiteUniqueConstraintErrno
+	e, ok := err.(sqlite3.Error)
+	if ok {
+		return e.ExtendedCode == SQLiteUniqueConstraintErrno
+	}
+	pe, ok := err.(*sqlite3.Error)
+	return ok && pe.ExtendedCode == SQLiteUniqueConstraintErrno
 }
 
 // CreateErr checks gorm.DB after create operated, will only return xstatus.DbSuccess, xstatus.DbExisted and xstatus.DbFailed.

@@ -76,14 +76,18 @@ const (
 
 // IsMySQLDuplicateEntryError checks if err is MySQL's ER_DUP_ENTRY error, its error code is MySQLDuplicateEntryErrno.
 func IsMySQLDuplicateEntryError(err error) bool {
-	mysqlErr, ok := err.(*mysql.MySQLError)
-	return ok && mysqlErr.Number == MySQLDuplicateEntryErrno
+	e, ok := err.(*mysql.MySQLError)
+	return ok && e.Number == MySQLDuplicateEntryErrno
 }
 
 // IsPostgreSQLUniqueViolationError checks if err is PostgreSQL's unique_violation error, its error code is PostgreSQLUniqueViolationErrno.
 func IsPostgreSQLUniqueViolationError(err error) bool {
-	postgresErr, ok := err.(pq.Error)
-	return ok && postgresErr.Code == PostgreSQLUniqueViolationErrno
+	e, ok := err.(pq.Error)
+	if ok {
+		return e.Code == PostgreSQLUniqueViolationErrno
+	}
+	pe, ok := err.(*pq.Error)
+	return ok && pe.Code == PostgreSQLUniqueViolationErrno
 }
 
 // ==============

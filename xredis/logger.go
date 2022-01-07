@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/Aoi-hosizora/ahlib/xstring"
 	"github.com/go-redis/redis/v8"
 	"github.com/sirupsen/logrus"
 	"runtime"
-	"strconv"
 	"strings"
-	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -44,27 +44,26 @@ func WithSkip(skip int) LoggerOption {
 	}
 }
 
-var (
-	// _enable is a global flag to control behaviors of LogrusLogger and StdLogger.
-	_enable = true
+// _enable is a global flag to control behaviors of LogrusLogger and StdLogger, initials to true.
+var _enable atomic.Value
 
-	// _enableMu locks _enable.
-	_enableMu sync.RWMutex
-)
+func init() {
+	_enable.Store(true)
+}
 
 // EnableLogger enables LogrusLogger and StdLogger to do any log.
 func EnableLogger() {
-	_enableMu.Lock()
-	_enable = true
-	_enableMu.Unlock()
+	_enable.Store(true)
 }
 
 // DisableLogger disables LogrusLogger and StdLogger.
 func DisableLogger() {
-	_enableMu.Lock()
-	_enable = false
-	_enableMu.Unlock()
+	_enable.Store(false)
 }
+
+// =====
+// types
+// =====
 
 // ILogger abstracts redis's internal logger to an interface.
 type ILogger interface {
@@ -88,10 +87,11 @@ func (s *SilenceLogger) Printf(context.Context, string, ...interface{}) {}
 
 // LogrusLogger represents a redis.Hook as redis's logger, used to log redis's executing message to logrus.Logger.
 type LogrusLogger struct {
-	redis.Hook
 	logger *logrus.Logger
 	option *loggerOptions
 }
+
+var _ redis.Hook = (*LogrusLogger)(nil)
 
 // NewLogrusLogger creates a new LogrusLogger using given logrus.Logger and LoggerOption-s.
 //
@@ -113,7 +113,6 @@ func NewLogrusLogger(logger *logrus.Logger, options ...LoggerOption) *LogrusLogg
 
 // StdLogger represents a redis.Hook as redis's logger, used to log redis's executing message to logrus.StdLogger.
 type StdLogger struct {
-	redis.Hook
 	logger logrus.StdLogger
 	option *loggerOptions
 }
@@ -148,7 +147,7 @@ func (l *LogrusLogger) BeforeProcess(ctx context.Context, _ redis.Cmder) (contex
 }
 
 // BeforeProcess implements redis.Hook interface, it saves start time to context, and will be used in AfterProcess.
-func (s *StdLogger) BeforeProcess(ctx context.Context, _ redis.Cmder) (context.Context, error) {
+func (l *StdLogger) BeforeProcess(ctx context.Context, _ redis.Cmder) (context.Context, error) {
 	return context.WithValue(ctx, &_startTimeKey, time.Now()), nil
 }
 
@@ -156,53 +155,113 @@ func (s *StdLogger) BeforeProcess(ctx context.Context, _ redis.Cmder) (context.C
 func (l *LogrusLogger) AfterProcess(ctx context.Context, cmd redis.Cmder) error {
 	endTime := time.Now()
 	startTime, ok := ctx.Value(&_startTimeKey).(time.Time)
-	_enableMu.RLock()
-	enable := _enable
-	_enableMu.RUnlock()
+	enable := _enable.Load().(bool)
 	if !enable || !ok {
 		return nil // ignore
 	}
 
+	du := endTime.Sub(startTime)
 	_, file, line, _ := runtime.Caller(l.option.skip) // defaults to 1
 	source := fmt.Sprintf("%s:%d", file, line)
-	m, f, isErr := extractLoggerData(cmd, endTime.Sub(startTime), source)
-	if isErr && l.option.logErr {
+
+	p := extractLoggerParam(cmd, du, source)
+	m := formatLoggerParam(p)
+	f := fieldifyLoggerParam(p)
+	if p.ErrorMsg != "" && l.option.logErr {
 		l.logger.WithFields(f).Error(m)
-	} else if !isErr && l.option.logCmd {
+	} else if p.ErrorMsg == "" && l.option.logCmd {
 		l.logger.WithFields(f).Info(m)
 	}
-
 	return nil
 }
 
 // AfterProcess implements redis.Hook interface, it logs redis's message to logrus.StdLogger.
-func (s *StdLogger) AfterProcess(ctx context.Context, cmd redis.Cmder) error {
+func (l *StdLogger) AfterProcess(ctx context.Context, cmd redis.Cmder) error {
 	endTime := time.Now()
 	startTime, ok := ctx.Value(&_startTimeKey).(time.Time)
-	_enableMu.RLock()
-	enable := _enable
-	_enableMu.RUnlock()
+	enable := _enable.Load().(bool)
 	if !enable || !ok {
 		return nil // ignore
 	}
 
-	_, file, line, _ := runtime.Caller(s.option.skip) // defaults to 1
+	du := endTime.Sub(startTime)
+	_, file, line, _ := runtime.Caller(l.option.skip) // defaults to 1
 	source := fmt.Sprintf("%s:%d", file, line)
-	m, _, isErr := extractLoggerData(cmd, endTime.Sub(startTime), source)
-	if (isErr && s.option.logErr) || (!isErr && s.option.logCmd) {
-		s.logger.Print(m)
-	}
 
+	p := extractLoggerParam(cmd, du, source)
+	m := formatLoggerParam(p)
+	if (p.ErrorMsg != "" && l.option.logErr) || (p.ErrorMsg == "" && l.option.logCmd) {
+		l.logger.Print(m)
+	}
 	return nil
 }
 
-// ========
-// internal
-// ========
+// BeforeProcessPipeline implements redis.Hook interface.
+func (*LogrusLogger) BeforeProcessPipeline(ctx context.Context, _ []redis.Cmder) (context.Context, error) {
+	return ctx, nil
+}
 
-// extractLoggerData extracts and formats given redis.Cmder, time.Duration and source string to logger message and logrus.Fields.
+// AfterProcessPipeline implements redis.Hook interface.
+func (*LogrusLogger) AfterProcessPipeline(context.Context, []redis.Cmder) error {
+	return nil
+}
+
+// BeforeProcessPipeline implements redis.Hook interface.
+func (*StdLogger) BeforeProcessPipeline(ctx context.Context, _ []redis.Cmder) (context.Context, error) {
+	return ctx, nil
+}
+
+// AfterProcessPipeline implements redis.Hook interface.
+func (*StdLogger) AfterProcessPipeline(context.Context, []redis.Cmder) error {
+	return nil
+}
+
+// =======
+// extract
+// =======
+
+// LoggerParam stores some logger parameters and is used by LogrusLogger and StdLogger.
+type LoggerParam struct {
+	Command  string
+	Rows     int64
+	Status   string
+	Duration time.Duration
+	Source   string
+	ErrorMsg string
+}
+
+var (
+	// FormatLoggerFunc is a custom LoggerParam's format function for LogrusLogger and StdLogger.
+	FormatLoggerFunc func(p *LoggerParam) string
+
+	// FieldifyLoggerFunc is a custom LoggerParam's fieldify function for LogrusLogger.
+	FieldifyLoggerFunc func(p *LoggerParam) logrus.Fields
+)
+
+// extractLoggerParam extracts and returns LoggerParam using given parameters.
+func extractLoggerParam(cmd redis.Cmder, duration time.Duration, source string) *LoggerParam {
+	err := cmd.Err()
+	isnil := errors.Is(err, redis.Nil)
+	command := render(cmd.Args())
+	if err != nil && !isnil {
+		return &LoggerParam{Command: command, ErrorMsg: err.Error(), Source: source}
+	}
+	rows, status := int64(0), "Nil"
+	if !isnil {
+		rows, status = statusFromCmder(cmd)
+	}
+	return &LoggerParam{
+		Command:  command,
+		Rows:     rows,
+		Status:   status,
+		Duration: duration,
+		Source:   source,
+	}
+}
+
+// formatLoggerParam formats given LoggerParam to string for LogrusLogger and StdLogger.
 //
-// Logs like:
+// The default format logs like:
 // 	[Redis] ERR invalid password | SET test_a test_aaa | F:/Projects/ahlib-db/xredis/redis_test.go:41
 // 	[Redis]    Nil |   305.9909ms | GET test | F:/Projects/ahlib-db/xredis/redis_test.go:126
 // 	[Redis]      3 |      995.5µs | KEYS tes* | F:/Projects/ahlib-db/xredis/redis_test.go:146
@@ -211,133 +270,132 @@ func (s *StdLogger) AfterProcess(ctx context.Context, cmd redis.Cmder) error {
 // 	[Redis]     OK |    25.9306ms | SET 'test num' 1 | F:/Projects/ahlib-db/xredis/redis_test.go:59
 // 	       |------| |------------| |----------------| |--------------------------------------------|
 // 	          6           12               ...                               ...
-func extractLoggerData(cmd redis.Cmder, duration time.Duration, source string) (string, logrus.Fields, bool) {
-	var msg string
-	var fields logrus.Fields
-	var isErr bool
+func formatLoggerParam(p *LoggerParam) string {
+	if FormatLoggerFunc != nil {
+		return FormatLoggerFunc(p)
+	}
+	if p.ErrorMsg != "" {
+		return fmt.Sprintf("[Redis] %v | %s | %s", p.ErrorMsg, p.Command, p.Source)
+	}
+	first := p.Status // # | status (OK, Nil, T, F, Str, ...)
+	if first == "" {
+		first = fmt.Sprintf("#=%d", p.Rows)
+	}
+	return fmt.Sprintf("[Redis] %6s | %12s | %s | %s", first, p.Duration.String(), p.Command, p.Source)
+}
 
-	err := cmd.Err()
-	isnil := errors.Is(err, redis.Nil)
-	if err != nil && !isnil {
-		// error
-		isErr = true
-		command := render(cmd.Args())
-		msg = fmt.Sprintf("[Redis] %v | %s | %s", err, command, source)
-		fields = logrus.Fields{"module": "redis", "command": command, "error": err, "source": source}
-	} else {
-		// result
-		command := render(cmd.Args())
-		rows, status := getDataFromCmder(cmd)
-		first := "" // first field
-		if isnil {
-			first = "Nil" // Nil
-		} else {
-			first = status // OK | #
-			if first == "" {
-				first = strconv.Itoa(rows)
-			}
-		}
-		msg = fmt.Sprintf("[Redis] %6s | %12s | %s | %s", first, duration.String(), command, source)
-		fields = logrus.Fields{
-			"module":   "redis",
-			"command":  command,
-			"rows":     rows,
-			"status":   status,
-			"duration": duration,
-			"source":   source,
+// fieldifyLoggerParam fieldifies given LoggerParam to logrus.Fields for LogrusLogger.
+//
+// The default contains the following fields: module, command, rows, status, duration, source, error.
+func fieldifyLoggerParam(p *LoggerParam) logrus.Fields {
+	if FieldifyLoggerFunc != nil {
+		return FieldifyLoggerFunc(p)
+	}
+	if p.ErrorMsg != "" {
+		return logrus.Fields{
+			"module":  "redis",
+			"command": p.Command,
+			"error":   p.ErrorMsg,
+			"source":  p.Source,
 		}
 	}
-
-	return msg, fields, isErr
+	return logrus.Fields{
+		"module":   "redis",
+		"command":  p.Command,
+		"rows":     p.Rows,
+		"status":   p.Status,
+		"duration": p.Duration,
+		"source":   p.Source,
+	}
 }
+
+// ========
+// internal
+// ========
 
 // render renders given command parameters to form the redis command expression.
 func render(args []interface{}) string {
 	sb := strings.Builder{}
 	sb.WriteString(strings.ToUpper(args[0].(string)))
 	for _, arg := range args[1:] {
-		argStr := ""
+		s := ""
 		if s, ok := arg.(string); ok && strings.Contains(s, " ") {
-			argStr = fmt.Sprintf("'%s'", s)
+			s = fmt.Sprintf("'%s'", s)
 		} else {
-			argStr = fmt.Sprintf("%v", arg)
+			s = fmt.Sprintf("%v", arg)
 		}
 		sb.WriteRune(' ')
-		sb.WriteString(argStr)
+		sb.WriteString(s)
 	}
 	return sb.String()
 }
 
-// getDataFromCmder parses redis.Cmder and get rows and status.
-func getDataFromCmder(cmder redis.Cmder) (rows int, status string) {
+// statusFromCmder parses redis.Cmder and returns rows and status information.
+func statusFromCmder(cmder redis.Cmder) (rows int64, status string) {
+	r, s := 1, ""
 	switch cmd := cmder.(type) {
 	// 1. value
 	case *redis.StatusCmd:
-		rows = 1
-		status = cmd.Val()
+		s = cmd.Val()
 	case *redis.BoolCmd:
-		rows = 1
-		status = "T"
-		if !cmd.Val() {
-			status = "F"
-		}
+		s = xstring.Bool(cmd.Val(), "T", "F")
 	case *redis.IntCmd:
-		rows = 1
-		status = fmt.Sprintf("%di", cmd.Val())
+		s = fmt.Sprintf("%di", cmd.Val())
 	case *redis.FloatCmd:
-		rows = 1
-		status = fmt.Sprintf("%.1ff", cmd.Val())
+		s = fmt.Sprintf("%.1ff", cmd.Val())
 	case *redis.StringCmd:
-		rows = 1
-		status = "str"
+		s = "Str"
 
 	// 2. slice
 	case *redis.IntSliceCmd:
-		rows = len(cmd.Val())
+		r = len(cmd.Val())
 	case *redis.StringSliceCmd:
-		rows = len(cmd.Val())
+		r = len(cmd.Val())
 	case *redis.BoolSliceCmd:
-		rows = len(cmd.Val())
+		r = len(cmd.Val())
 	case *redis.SliceCmd:
-		rows = len(cmd.Val())
+		r = len(cmd.Val())
 	case *redis.ZSliceCmd:
-		rows = len(cmd.Val())
+		r = len(cmd.Val())
 	case *redis.XMessageSliceCmd:
-		rows = len(cmd.Val())
+		r = len(cmd.Val())
 	case *redis.XStreamSliceCmd:
-		rows = len(cmd.Val())
+		r = len(cmd.Val())
 	case *redis.ScanCmd:
 		val, _ := cmd.Val()
-		rows = len(val)
+		r = len(val)
 	case *redis.ClusterSlotsCmd:
-		rows = len(cmd.Val())
+		r = len(cmd.Val())
 	case *redis.GeoLocationCmd:
-		rows = len(cmd.Val())
+		r = len(cmd.Val())
 	case *redis.GeoPosCmd:
-		rows = len(cmd.Val())
+		r = len(cmd.Val())
 	case *redis.SlowLogCmd:
-		rows = len(cmd.Val())
+		r = len(cmd.Val())
 	case *redis.XInfoGroupsCmd:
-		rows = len(cmd.Val())
+		r = len(cmd.Val())
 	case *redis.XPendingCmd:
-		c := cmd.Val().Consumers
-		rows = len(c)
+		r = len(cmd.Val().Consumers)
 	case *redis.XPendingExtCmd:
-		rows = len(cmd.Val())
+		r = len(cmd.Val())
 
 	// 3. map
 	case *redis.StringIntMapCmd:
-		rows = len(cmd.Val())
+		r = len(cmd.Val())
 	case *redis.StringStringMapCmd:
-		rows = len(cmd.Val())
+		r = len(cmd.Val())
 	case *redis.StringStructMapCmd:
-		rows = len(cmd.Val())
+		r = len(cmd.Val())
 	case *redis.CommandsInfoCmd:
-		rows = len(cmd.Val())
+		r = len(cmd.Val())
 
 	// 4. other
-	case *redis.DurationCmd, *redis.TimeCmd, *redis.Cmd, *redis.XInfoStreamCmd, *redis.ZWithKeyCmd:
-		rows = 1
+	case *redis.DurationCmd,
+		*redis.TimeCmd,
+		*redis.Cmd,
+		*redis.XInfoStreamCmd,
+		*redis.ZWithKeyCmd:
+		r = 1
 	}
-	return rows, status
+	return int64(r), s
 }
