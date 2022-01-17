@@ -1,4 +1,4 @@
-package xgorm
+package xgormv2
 
 import (
 	"errors"

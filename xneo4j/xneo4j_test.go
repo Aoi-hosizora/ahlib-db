@@ -250,14 +250,14 @@ func TestLogger(t *testing.T) {
 	}{
 		{"default", true, false, func(s S) S { return s }},
 		//
-		{"logrus", true, false, func(s S) S { return NewLogrusLogger(s, l1) }},
+		{"logrus", true, false, func(s S) S { return NewLogrusLogger(s, l1, WithSlowThreshold(time.Millisecond*10)) }},
 		{"logrus_custom", true, true, func(s S) S { return NewLogrusLogger(s, l1) }},
 		{"logrus_no_err", true, false, func(s S) S { return NewLogrusLogger(s, l1, WithLogErr(false)) }},
 		{"logrus_no_cypher", true, false, func(s S) S { return NewLogrusLogger(s, l1, WithLogCypher(false)) }},
 		{"logrus_counter", true, false, func(s S) S { return NewLogrusLogger(s, l1, WithCounterField(true)) }},
 		{"logrus_disable", false, false, func(s S) S { return NewLogrusLogger(s, l1) }},
 		//
-		{"stdlog", true, false, func(s S) S { return NewStdLogger(s, l2, WithSkip(1)) }},
+		{"stdlog", true, false, func(s S) S { return NewStdLogger(s, l2, WithSkip(1), WithSlowThreshold(time.Millisecond*10)) }},
 		{"stdlog_custom", true, true, func(s S) S { return NewStdLogger(s, l2, WithSkip(1)) }},
 		{"stdlog_no_xxx", true, false, func(s S) S { return NewStdLogger(s, l2, WithLogErr(false), WithLogCypher(false)) }},
 		{"stdlog_disable", false, false, func(s S) S { return NewStdLogger(s, l2) }},

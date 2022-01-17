@@ -94,13 +94,13 @@ func TestLogger(t *testing.T) {
 	}{
 		{"default", true, false, nil},
 		//
-		{"logrus", true, false, NewLogrusLogger(l1)},
+		{"logrus", true, false, NewLogrusLogger(l1, WithSlowThreshold(time.Millisecond*1))},
 		{"logrus_custom", true, true, NewLogrusLogger(l1)},
 		{"logrus_no_err", true, false, NewLogrusLogger(l1, WithLogErr(false))},
 		{"logrus_no_cmd", true, false, NewLogrusLogger(l1, WithLogCmd(false))},
 		{"logrus_disable", false, false, NewLogrusLogger(l1)},
 		//
-		{"stdlog", true, false, NewStdLogger(l2, WithSkip(4))},
+		{"stdlog", true, false, NewStdLogger(l2, WithSkip(4), WithSlowThreshold(time.Millisecond*1))},
 		{"stdlog_custom", true, true, NewStdLogger(l2, WithSkip(4))},
 		{"stdlog_no_xxx", true, false, NewStdLogger(l2, WithLogErr(false), WithLogCmd(false))},
 		{"stdlog_disable", false, false, NewStdLogger(l2)},

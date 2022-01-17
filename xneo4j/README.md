@@ -67,6 +67,7 @@
 + `func WithLogCypher(log bool) LoggerOption`
 + `func WithCounterField(flag bool) LoggerOption`
 + `func WithSkip(skip int) LoggerOption`
++ `func WithSlowThreshold(threshold time.Duration) LoggerOption`
 + `func EnableLogger()`
 + `func DisableLogger()`
 + `func NewLogrusLogger(session neo4j.Session, logger *logrus.Logger, options ...LoggerOption) *LogrusLogger`

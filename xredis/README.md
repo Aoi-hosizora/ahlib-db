@@ -34,6 +34,7 @@
 + `func WithLogErr(log bool) LoggerOption`
 + `func WithLogCmd(log bool) LoggerOption`
 + `func WithSkip(skip int) LoggerOption`
++ `func WithSlowThreshold(threshold time.Duration) LoggerOption`
 + `func EnableLogger()`
 + `func DisableLogger()`
 + `func NewSilenceLogger() *SilenceLogger`

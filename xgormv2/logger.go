@@ -1,17 +1,16 @@
-package xgorm
+package xgormv2
 
 import (
-	"database/sql/driver"
+	"context"
+	"errors"
 	"fmt"
 	"github.com/Aoi-hosizora/ahlib/xcolor"
-	"github.com/Aoi-hosizora/ahlib/xstring"
 	"github.com/sirupsen/logrus"
-	"reflect"
-	"regexp"
-	"strings"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
+	"gorm.io/gorm/utils"
 	"sync/atomic"
 	"time"
-	"unicode"
 )
 
 // loggerOptions is a type of LogrusLogger and StdLogger's option, each field can be set by LoggerOption function type.
@@ -39,7 +38,7 @@ func WithLogSQL(log bool) LoggerOption {
 	}
 }
 
-// WithLogOther creates a LoggerOption to decide whether to do log for other type (such as [log]) or not, defaults to true.
+// WithLogOther creates a LoggerOption to decide whether to do log for other type (such as [warn] and [erro]) or not, defaults to true.
 func WithLogOther(log bool) LoggerOption {
 	return func(o *loggerOptions) {
 		o.logOther = log
@@ -74,26 +73,26 @@ func DisableLogger() {
 // types
 // =====
 
-// ILogger abstracts gorm's internal logger to an interface, equals to gorm.logger interface.
-type ILogger interface {
-	Print(v ...interface{})
-}
-
-// SilenceLogger represents a gorm's logger, used to hide all logs, including [info], [sql] and so on. Note that `gorm.DB.LogMode(false)` will only hide [sql] message.
+// SilenceLogger represents a gorm's logger, used to hide all logs, including [info], [warn], [erro], [sql].
 type SilenceLogger struct{}
+
+var _ logger.Interface = (*SilenceLogger)(nil)
 
 // NewSilenceLogger creates a new SilenceLogger.
 //
 // Example:
-// 	db, err := gorm.Open("mysql", dsn)
-// 	db.LogMode(false) // both true and false are ok
-// 	db.SetLogger(xgorm.NewSilenceLogger())
+// 	gorm.Open(..., &gorm.Config{
+// 		Logger: NewSilenceLogger(),
+// 	})
 func NewSilenceLogger() *SilenceLogger {
 	return &SilenceLogger{}
 }
 
-// Print implements gorm.logger interface, it does nothing for logging.
-func (s *SilenceLogger) Print(...interface{}) {}
+func (s *SilenceLogger) LogMode(logger.LogLevel) logger.Interface                      { return s }
+func (*SilenceLogger) Info(context.Context, string, ...interface{})                    {}
+func (*SilenceLogger) Warn(context.Context, string, ...interface{})                    {}
+func (*SilenceLogger) Error(context.Context, string, ...interface{})                   {}
+func (*SilenceLogger) Trace(context.Context, time.Time, func() (string, int64), error) {}
 
 // LogrusLogger represents a gorm's logger, used to log gorm's executing message to logrus.Logger.
 type LogrusLogger struct {
@@ -101,14 +100,16 @@ type LogrusLogger struct {
 	option *loggerOptions
 }
 
+var _ logger.Interface = (*LogrusLogger)(nil)
+
 // NewLogrusLogger creates a new LogrusLogger using given logrus.Logger and LoggerOption-s.
 //
 // Example:
-// 	db, err := gorm.Open("mysql", dsn)
-// 	db.LogMode(true) // must be true
 // 	l := logrus.New()
 // 	l.SetFormatter(&logrus.TextFormatter{})
-// 	db.SetLogger(xgorm.NewLogrusLogger(l))
+// 	gorm.Open(..., &gorm.Config{
+// 		Logger: NewLogrusLogger(l),
+// 	})
 func NewLogrusLogger(logger *logrus.Logger, options ...LoggerOption) *LogrusLogger {
 	opt := &loggerOptions{logInfo: true, logSQL: true, logOther: true}
 	for _, o := range options {
@@ -125,13 +126,15 @@ type StdLogger struct {
 	option *loggerOptions
 }
 
+var _ logger.Interface = (*StdLogger)(nil)
+
 // NewStdLogger creates a new StdLogger using given logrus.StdLogger and LoggerOption-s.
 //
 // Example:
-// 	db, err := gorm.Open("mysql", dsn)
-// 	db.LogMode(true) // must be true
 // 	l := log.Default()
-// 	db.SetLogger(xgorm.NewStdLogger(l))
+// 	gorm.Open(..., &gorm.Config{
+// 		Logger: NewStdLogger(l),
+// 	})
 func NewStdLogger(logger logrus.StdLogger, options ...LoggerOption) *StdLogger {
 	opt := &loggerOptions{logInfo: true, logSQL: true, logOther: true}
 	for _, o := range options {
@@ -146,14 +149,14 @@ func NewStdLogger(logger logrus.StdLogger, options ...LoggerOption) *StdLogger {
 // methods
 // =======
 
-// Print implements gorm.logger interface, it logs gorm's message to logrus.Logger.
-func (l *LogrusLogger) Print(v ...interface{}) {
+// doPrint implements gorm.logger interface, it logs gorm's message to logrus.Logger.
+func (l *LogrusLogger) doPrint(level logger.LogLevel, msg string, v []interface{}) {
 	enable := _enable.Load().(bool)
-	if !enable || len(v) <= 1 {
+	if !enable {
 		return // ignore
 	}
 
-	p := extractLoggerParam(v, l.option)
+	p := extractLoggerParam(level, msg, v, l.option)
 	switch {
 	case p == nil,
 		p.Type == "info" && !l.option.logInfo,
@@ -166,14 +169,14 @@ func (l *LogrusLogger) Print(v ...interface{}) {
 	l.logger.WithFields(f).Info(m)
 }
 
-// Print implements gorm.logger interface, it logs gorm's message to logrus.StdLogger.
-func (l *StdLogger) Print(v ...interface{}) {
+// doPrint implements gorm.logger interface, it logs gorm's message to logrus.StdLogger.
+func (l *StdLogger) doPrint(level logger.LogLevel, msg string, v []interface{}) {
 	enable := _enable.Load().(bool)
-	if !enable || len(v) <= 1 {
+	if !enable {
 		return // ignore
 	}
 
-	p := extractLoggerParam(v, l.option)
+	p := extractLoggerParam(level, msg, v, l.option)
 	switch {
 	case p == nil,
 		p.Type == "info" && !l.option.logInfo,
@@ -183,6 +186,58 @@ func (l *StdLogger) Print(v ...interface{}) {
 	}
 	m := formatLoggerParam(p)
 	l.logger.Print(m)
+}
+
+// LogMode implements logger.Interface for LogrusLogger.
+func (l *LogrusLogger) LogMode(logger.LogLevel) logger.Interface {
+	return l
+}
+
+// Info implements logger.Interface for LogrusLogger.
+func (l *LogrusLogger) Info(_ context.Context, msg string, data ...interface{}) {
+	l.doPrint(logger.Info, msg, data)
+}
+
+// Warn implements logger.Interface for LogrusLogger.
+func (l *LogrusLogger) Warn(_ context.Context, msg string, data ...interface{}) {
+	l.doPrint(logger.Warn, msg, data)
+}
+
+// Error implements logger.Interface for LogrusLogger.
+func (l *LogrusLogger) Error(_ context.Context, msg string, data ...interface{}) {
+	l.doPrint(logger.Error, msg, data)
+}
+
+// Trace implements logger.Interface for LogrusLogger.
+func (l *LogrusLogger) Trace(_ context.Context, begin time.Time, fc func() (sql string, rowsAffected int64), err error) {
+	sql, row := fc()
+	l.doPrint(logger.Info+1, "", []interface{}{utils.FileWithLineNum(), time.Now().Sub(begin), sql, row, err})
+}
+
+// LogMode implements logger.Interface for StdLogger.
+func (l *StdLogger) LogMode(logger.LogLevel) logger.Interface {
+	return l
+}
+
+// Info implements logger.Interface for StdLogger.
+func (l *StdLogger) Info(_ context.Context, msg string, data ...interface{}) {
+	l.doPrint(logger.Info, msg, data)
+}
+
+// Warn implements logger.Interface for StdLogger.
+func (l *StdLogger) Warn(_ context.Context, msg string, data ...interface{}) {
+	l.doPrint(logger.Warn, msg, data)
+}
+
+// Error implements logger.Interface for StdLogger.
+func (l *StdLogger) Error(_ context.Context, msg string, data ...interface{}) {
+	l.doPrint(logger.Error, msg, data)
+}
+
+// Trace implements logger.Interface for StdLogger.
+func (l *StdLogger) Trace(_ context.Context, begin time.Time, fc func() (sql string, rowsAffected int64), err error) {
+	sql, row := fc()
+	l.doPrint(logger.Info+1, "", []interface{}{utils.FileWithLineNum(), time.Now().Sub(begin), sql, row, err})
 }
 
 // =======
@@ -209,26 +264,34 @@ var (
 )
 
 // extractLoggerParam extracts and returns LoggerParam using given parameters.
-func extractLoggerParam(v []interface{}, options *loggerOptions) *LoggerParam {
+func extractLoggerParam(level logger.LogLevel, msg string, v []interface{}, options *loggerOptions) *LoggerParam {
 	switch {
-	case len(v) <= 1:
+	case level == logger.Info:
+		return &LoggerParam{Type: "info", Message: fmt.Sprint("[info] ", fmt.Sprintf(msg, v...))}
+	case level == logger.Warn:
+		return &LoggerParam{Type: "warn", Message: fmt.Sprint("[warn] ", fmt.Sprintf(msg, v...))}
+	case level == logger.Error:
+		return &LoggerParam{Type: "erro", Message: fmt.Sprint("[erro] ", fmt.Sprintf(msg, v...))}
+	case len(v) == 0:
 		return nil // unreachable
-	case len(v) == 2: // [INFO], ...
-		return &LoggerParam{Type: v[0].(string), Message: fmt.Sprintf("%v", v[1])}
-	case v[0] != "sql": // [LOG], ...
-		return &LoggerParam{Type: v[0].(string), Message: fmt.Sprintf("[%s] %v", v[0], fmt.Sprint(v[2:]...))}
 	default: // [SQL]
-		source := v[1].(string)
-		duration := v[2].(time.Duration)
+		source := v[0].(string)
+		duration := v[1].(time.Duration)
 		slow := options.slowThreshold > 0 && duration >= options.slowThreshold
-		sql := render(v[3].(string), v[4].([]interface{}))
-		rows := v[5].(int64)
+		sql := v[2].(string)
+		rows := v[3].(int64)
+		err, ok := v[4].(error)
+		errMsg := ""
+		if ok && !errors.Is(err, gorm.ErrRecordNotFound) {
+			errMsg = err.Error()
+		}
 		return &LoggerParam{
-			Type:     v[0].(string),
+			Type:     "sql",
 			SQL:      sql,
 			Rows:     rows,
 			Duration: duration,
 			Slow:     slow,
+			Message:  errMsg,
 			Source:   source,
 		}
 	}
@@ -253,7 +316,11 @@ func formatLoggerParam(p *LoggerParam) string {
 	if p.Slow {
 		du = xcolor.Yellow.WithStyle(xcolor.Bold).Sprintf("%12s", p.Duration.String())
 	}
-	return fmt.Sprintf("[Gorm] %7d | %s | %s | %s", p.Rows, du, p.SQL, p.Source)
+	foot := p.Source
+	if p.Message != "" {
+		foot = fmt.Sprintf("%s | %s", p.Message, p.Source)
+	}
+	return fmt.Sprintf("[Gorm] %7d | %s | %s | %s", p.Rows, du, p.SQL, foot)
 }
 
 // fieldifyLoggerParam fieldifies given LoggerParam to logrus.Fields for LogrusLogger.
@@ -266,7 +333,7 @@ func fieldifyLoggerParam(p *LoggerParam) logrus.Fields {
 	if p.Type != "sql" {
 		return logrus.Fields{
 			"module":  "gorm",
-			"type":    p.Type, // info / log / ...
+			"type":    p.Type, // info / warn / erro
 			"message": p.Message,
 		}
 	}
@@ -277,80 +344,6 @@ func fieldifyLoggerParam(p *LoggerParam) logrus.Fields {
 		"rows":     p.Rows,
 		"duration": p.Duration,
 		"source":   p.Source,
+		"message":  p.Message,
 	}
-}
-
-// ========
-// internal
-// ========
-
-// isPrintable is a string utility function used in render.
-func isPrintable(s string) bool {
-	for _, r := range s {
-		if !unicode.IsPrint(r) {
-			return false
-		}
-	}
-	return true
-}
-
-// some regexps used in render.
-var (
-	_placeholderRegexp        = regexp.MustCompile(`\?`)
-	_numericPlaceholderRegexp = regexp.MustCompile(`\$\d+`)
-)
-
-// render renders given sql string and parameters to form the sql expression.
-func render(sql string, params []interface{}) string {
-	values := make([]string, 0, len(params))
-	for _, v := range params {
-		indirectValue := reflect.Indirect(reflect.ValueOf(v))
-		if !indirectValue.IsValid() {
-			values = append(values, "NULL")
-			continue
-		}
-
-		v = indirectValue.Interface()
-		switch value := v.(type) {
-		case time.Time:
-			if value.IsZero() {
-				values = append(values, fmt.Sprintf("'%v'", "0000-00-00 00:00:00"))
-			} else {
-				values = append(values, fmt.Sprintf("'%v'", value.Format("2006-01-02 15:04:05")))
-			}
-		case []byte:
-			if str := xstring.FastBtos(value); isPrintable(str) {
-				values = append(values, fmt.Sprintf("'%v'", str))
-			} else {
-				values = append(values, "'<binary>'")
-			}
-		case driver.Valuer:
-			if val, err := value.Value(); err == nil && val != nil {
-				values = append(values, fmt.Sprintf("'%v'", val))
-			} else {
-				values = append(values, "NULL")
-			}
-		case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64, bool:
-			values = append(values, fmt.Sprintf("%v", value))
-		default:
-			values = append(values, fmt.Sprintf("'%v'", value))
-		}
-	}
-
-	result := ""
-	if _numericPlaceholderRegexp.MatchString(sql) { // \$\d+
-		result = sql + " "
-		for idx, value := range values {
-			placeholder := fmt.Sprintf(`\$%d(\D)`, idx+1) // \$1(\D) X
-			result = regexp.MustCompile(placeholder).ReplaceAllString(result, value+"$1")
-		}
-	} else {
-		for idx, val := range _placeholderRegexp.Split(sql, -1) { // \?
-			result += val
-			if idx < len(values) {
-				result += values[idx]
-			}
-		}
-	}
-	return strings.TrimSpace(result)
 }

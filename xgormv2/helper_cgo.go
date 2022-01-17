@@ -1,7 +1,7 @@
 //go:build cgo
 // +build cgo
 
-package xgorm
+package xgormv2
 
 import (
 	"github.com/Aoi-hosizora/ahlib/xstatus"

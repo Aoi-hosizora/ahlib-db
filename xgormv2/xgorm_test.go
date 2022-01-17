@@ -1,7 +1,8 @@
-package xgorm
+package xgormv2
 
 import (
 	"errors"
+	"fmt"
 	"github.com/Aoi-hosizora/ahlib/xstatus"
 	"github.com/Aoi-hosizora/ahlib/xtesting"
 	"github.com/go-sql-driver/mysql"
@@ -54,19 +55,11 @@ func testHook(t *testing.T, giveDialector gorm.Dialector) {
 		return nil
 	}
 
-	db, err := gorm.Open(giveDialector, &gorm.Config{
-		Logger: logger.New(log.Default(), logger.Config{
-			LogLevel:                  logger.Info,
-			IgnoreRecordNotFoundError: false,
-			Colorful:                  true,
-		}),
-	})
+	db, err := gorm.Open(giveDialector, &gorm.Config{Logger: NewLogrusLogger(l)})
 	if !xtesting.Nil(t, err) {
 		t.FailNow()
 	}
 	_ = CreateCallbackName
-	// db.LogMode(true)
-	// db.SetLogger(NewLogrusLogger(l))
 	HookDeletedAt(db, DefaultDeletedAtTimestamp)
 	db.Migrator().DropTable(&User{})
 	defer db.Migrator().DropTable(&User{})
@@ -111,18 +104,10 @@ func testHelper(t *testing.T, giveDialector gorm.Dialector) {
 	l := logrus.New()
 	l.SetFormatter(&logrus.TextFormatter{ForceColors: true, FullTimestamp: true, TimestampFormat: time.RFC3339})
 
-	db, err := gorm.Open(giveDialector, &gorm.Config{
-		Logger: logger.New(log.Default(), logger.Config{
-			LogLevel:                  logger.Info,
-			IgnoreRecordNotFoundError: false,
-			Colorful:                  true,
-		}),
-	})
+	db, err := gorm.Open(giveDialector, &gorm.Config{Logger: NewLogrusLogger(l)})
 	if !xtesting.Nil(t, err) {
 		t.FailNow()
 	}
-	// db.LogMode(true)
-	// db.SetLogger(NewLogrusLogger(l))
 	HookDeletedAt(db, DefaultDeletedAtTimestamp)
 	db.Migrator().DropTable(&User{})
 	defer db.Migrator().DropTable(&User{})
@@ -207,5 +192,71 @@ func testHelper(t *testing.T, giveDialector gorm.Dialector) {
 		{"username desc, age desc", dict, "firstname DESC, lastname DESC, birthday ASC"},
 	} {
 		xtesting.Equal(t, GenerateOrderByExp(tc.giveSource, tc.giveDict), tc.want)
+	}
+}
+
+func testLogger(t *testing.T, giveDialector gorm.Dialector) {
+	l1 := logrus.New()
+	l1.SetFormatter(&logrus.TextFormatter{ForceColors: true, FullTimestamp: true, TimestampFormat: time.RFC3339})
+	l2 := log.Default()
+
+	for _, tc := range []struct {
+		name   string
+		enable bool
+		custom bool
+		logger logger.Interface
+	}{
+		{"silence", true, false, NewSilenceLogger()},
+		//
+		{"logrus", true, false, NewLogrusLogger(l1, WithSlowThreshold(time.Millisecond*10))},
+		{"logrus_custom", true, true, NewLogrusLogger(l1)},
+		{"logrus_no_info_other", true, false, NewLogrusLogger(l1, WithLogInfo(false), WithLogOther(false))},
+		{"logrus_no_sql", true, false, NewLogrusLogger(l1, WithLogSQL(false))},
+		{"logrus_disable", false, false, NewLogrusLogger(l1)},
+		//
+		{"stdlog", true, false, NewStdLogger(l2, WithSlowThreshold(time.Millisecond*10))},
+		{"stdlog_custom", true, true, NewStdLogger(l2)},
+		{"stdlog_no_xxx", true, false, NewStdLogger(l2, WithLogInfo(false), WithLogSQL(false), WithLogOther(false))},
+		{"stdlog_disable", false, false, NewStdLogger(l2)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			db, err := gorm.Open(giveDialector, &gorm.Config{Logger: tc.logger})
+			if !xtesting.Nil(t, err) {
+				t.FailNow()
+			}
+			if tc.enable {
+				EnableLogger()
+			} else {
+				DisableLogger()
+			}
+			if tc.custom {
+				FormatLoggerFunc = func(p *LoggerParam) string {
+					if p.Type != "sql" {
+						return fmt.Sprintf("[Gorm] msg: %s", p.Message)
+					}
+					return fmt.Sprintf("[Gorm] %7d - %12s - %s - %s", p.Rows, p.Duration.String(), p.SQL, p.Source)
+				}
+				FieldifyLoggerFunc = func(p *LoggerParam) logrus.Fields {
+					return logrus.Fields{"module": "gorm", "type": p.Type}
+				}
+				defer func() {
+					FormatLoggerFunc = nil
+					FieldifyLoggerFunc = nil
+				}()
+			}
+
+			HookDeletedAt(db, DefaultDeletedAtTimestamp) // log [info]
+			db.Migrator().DropTable(&User{})
+			defer db.Migrator().DropTable(&User{})
+			if !xtesting.Nil(t, db.AutoMigrate(&User{})) {
+				t.FailNow()
+			}
+
+			db.Create(&User{Uid: 1, Name: "user1"})
+			db.Create(&User{Uid: 1, Name: "user1"}) // log [log]
+			db.Model(&User{}).Where(&User{Uid: 1}).First(&User{})
+			db.Model(&User{}).Where("name = ? OR name = ?", []byte("user1"), []byte{0x00, 0x01}).First(&User{}) // ?
+			db.Model(&User{}).Where("deleted_at = $1 OR deleted_at = $2", time.Time{}, nil).First(&User{})      // $
+		})
 	}
 }

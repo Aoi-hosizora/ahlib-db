@@ -3,6 +3,7 @@ package xneo4j
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/Aoi-hosizora/ahlib/xcolor"
 	"github.com/Aoi-hosizora/ahlib/xstring"
 	"github.com/neo4j/neo4j-go-driver/neo4j"
 	"github.com/sirupsen/logrus"
@@ -16,10 +17,11 @@ import (
 
 // loggerOptions is a type of LogrusLogger and StdLogger's option, each field can be set by LoggerOption function type.
 type loggerOptions struct {
-	logErr       bool
-	logCypher    bool
-	counterField bool
-	skip         int
+	logErr        bool
+	logCypher     bool
+	counterField  bool
+	skip          int
+	slowThreshold time.Duration
 }
 
 // LoggerOption represents an option type for LogrusLogger and StdLogger's option, can be created by WithXXX functions.
@@ -50,6 +52,13 @@ func WithCounterField(flag bool) LoggerOption {
 func WithSkip(skip int) LoggerOption {
 	return func(o *loggerOptions) {
 		o.skip = skip
+	}
+}
+
+// WithSlowThreshold creates a LoggerOption to specific a slow operation's duration used to highlight loggers, defaults to 0ms, means no highlight.
+func WithSlowThreshold(threshold time.Duration) LoggerOption {
+	return func(o *loggerOptions) {
+		o.slowThreshold = threshold
 	}
 }
 
@@ -138,7 +147,7 @@ func (l *LogrusLogger) Run(cypher string, params map[string]interface{}, configu
 	_, file, line, _ := runtime.Caller(l.option.skip) // defaults to 4
 	source := fmt.Sprintf("%s:%d", file, line)
 
-	p := extractLoggerParam(result, err, source, l.option.counterField)
+	p := extractLoggerParam(result, err, source, l.option)
 	m := formatLoggerParam(p)
 	f := fieldifyLoggerParam(p)
 	if p.ErrorMsg != "" && l.option.logErr {
@@ -160,7 +169,7 @@ func (l *StdLogger) Run(cypher string, params map[string]interface{}, configurer
 	_, file, line, _ := runtime.Caller(l.option.skip) // defaults to 4
 	source := fmt.Sprintf("%s:%d", file, line)
 
-	p := extractLoggerParam(result, err, source, l.option.counterField)
+	p := extractLoggerParam(result, err, source, l.option)
 	m := formatLoggerParam(p)
 	if (p.ErrorMsg != "" && l.option.logErr) || (p.ErrorMsg == "" && l.option.logCypher) {
 		l.logger.Print(m)
@@ -177,6 +186,7 @@ type LoggerParam struct {
 	Type     string
 	Cypher   string
 	Duration time.Duration
+	Slow     bool
 	Source   string
 	Counter  neo4j.Counters
 	ErrorMsg string
@@ -191,7 +201,7 @@ var (
 )
 
 // extractLoggerParam extracts and returns LoggerParam using given parameters.
-func extractLoggerParam(result neo4j.Result, err error, source string, needCounter bool) *LoggerParam {
+func extractLoggerParam(result neo4j.Result, err error, source string, options *loggerOptions) *LoggerParam {
 	if err != nil {
 		// failed to connect (Connection error)
 		// the target machine actively refused it
@@ -221,13 +231,15 @@ func extractLoggerParam(result neo4j.Result, err error, source string, needCount
 	stat := summary.Statement()
 	cypher := render(stat.Text(), stat.Params())
 	du := summary.ResultAvailableAfter() + summary.ResultConsumedAfter()
+	slow := options.slowThreshold > 0 && du >= options.slowThreshold
 	p := &LoggerParam{
 		Type:     "Cypher",
 		Cypher:   cypher,
 		Duration: du,
+		Slow:     slow,
 		Source:   source,
 	}
-	if needCounter {
+	if options.counterField {
 		p.Counter = summary.Counters()
 	}
 	return p
@@ -248,7 +260,11 @@ func formatLoggerParam(p *LoggerParam) string {
 	if p.ErrorMsg != "" {
 		return fmt.Sprintf("[Neo4j] %v | %s", p.ErrorMsg, p.Source)
 	}
-	return fmt.Sprintf("[Neo4j] %6d | %12s | %s | %s", -1, p.Duration.String(), p.Cypher, p.Source)
+	du := fmt.Sprintf("%12s", p.Duration.String())
+	if p.Slow {
+		du = xcolor.Yellow.WithStyle(xcolor.Bold).Sprintf("%12s", p.Duration.String())
+	}
+	return fmt.Sprintf("[Neo4j] %6d | %s | %s | %s", -1, du, p.Cypher, p.Source)
 }
 
 // fieldifyLoggerParam fieldifies given LoggerParam to logrus.Fields for LogrusLogger.

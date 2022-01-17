@@ -1,7 +1,7 @@
 //go:build cgo
 // +build cgo
 
-package xgorm
+package xgormv2
 
 import (
 	"github.com/Aoi-hosizora/ahlib/xtesting"
@@ -49,6 +49,25 @@ func TestHelper(t *testing.T) {
 				testHelper(t, mysql.Open(tc.giveParam))
 			case SQLite:
 				testHelper(t, sqlite.Open(tc.giveParam))
+			}
+		})
+	}
+}
+
+func TestLogger(t *testing.T) {
+	for _, tc := range []struct {
+		giveDialect string
+		giveParam   string
+	}{
+		{MySQL, mysqlDsn},
+		{SQLite, sqliteFile},
+	} {
+		t.Run(tc.giveDialect, func(t *testing.T) {
+			switch tc.giveDialect {
+			case MySQL:
+				testLogger(t, mysql.Open(tc.giveParam))
+			case SQLite:
+				testLogger(t, sqlite.Open(tc.giveParam))
 			}
 		})
 	}

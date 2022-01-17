@@ -210,13 +210,13 @@ func testLogger(t *testing.T, giveDialect, giveParam string) {
 		{"disable_mode", false, true, false, nil},
 		{"silence", true, true, false, NewSilenceLogger()},
 		//
-		{"logrus", true, true, false, NewLogrusLogger(l1)},
+		{"logrus", true, true, false, NewLogrusLogger(l1, WithSlowThreshold(time.Millisecond*10))},
 		{"logrus_custom", true, true, true, NewLogrusLogger(l1)},
 		{"logrus_no_info_other", true, true, false, NewLogrusLogger(l1, WithLogInfo(false), WithLogOther(false))},
 		{"logrus_no_sql", true, true, false, NewLogrusLogger(l1, WithLogSQL(false))},
 		{"logrus_disable", true, false, false, NewLogrusLogger(l1)},
 		//
-		{"stdlog", true, true, false, NewStdLogger(l2)},
+		{"stdlog", true, true, false, NewStdLogger(l2, WithSlowThreshold(time.Millisecond*10))},
 		{"stdlog_custom", true, true, true, NewStdLogger(l2)},
 		{"stdlog_no_xxx", true, true, false, NewStdLogger(l2, WithLogInfo(false), WithLogSQL(false), WithLogOther(false))},
 		{"stdlog_disable", true, false, false, NewStdLogger(l2)},

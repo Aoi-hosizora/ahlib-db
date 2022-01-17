@@ -14,11 +14,11 @@
 
 ### Types
 
-+ `type GormTime struct`
-+ `type GormTime2 struct`
 + `type MySQLConfig struct`
 + `type PropertyValue struct`
 + `type PropertyDict map`
++ `type GormTime struct`
++ `type GormTime2 struct`
 + `type LoggerOption func`
 + `type ILogger interface`
 + `type SilenceLogger struct`
@@ -33,22 +33,21 @@
 
 ### Constants
 
-+ `const DefaultDeletedAtTimestamp string`
-+ `const CreateCallbackName string`
-+ `const UpdateCallbackName string`
-+ `const DeleteCallbackName string`
-+ `const QueryCallbackName string`
-+ `const RowQueryCallbackName string`
 + `const MySQL string`
 + `const SQLite string`
 + `const Postgres string`
 + `const MySQLDuplicateEntryErrno int`
 + `const SQLiteUniqueConstraintErrno int`
 + `const PostgreSQLUniqueViolationErrno string`
++ `const DefaultDeletedAtTimestamp string`
++ `const CreateCallbackName string`
++ `const UpdateCallbackName string`
++ `const DeleteCallbackName string`
++ `const QueryCallbackName string`
++ `const RowQueryCallbackName string`
 
 ### Functions
 
-+ `func HookDeletedAt(db *gorm.DB, defaultTimestamp string)`
 + `func IsMySQL(db *gorm.DB) bool`
 + `func IsSQLite(db *gorm.DB) bool`
 + `func IsPostgreSQL(db *gorm.DB) bool`
@@ -64,9 +63,11 @@
 + `func DeleteErr(rdb *gorm.DB) (xstatus.DbStatus, error)`
 + `func NewPropertyValue(reverse bool, destinations ...string) *PropertyValue`
 + `func GenerateOrderByExp(source string, dict PropertyDict) string`
++ `func HookDeletedAt(db *gorm.DB, defaultTimestamp string)`
 + `func WithLogInfo(log bool) LoggerOption`
 + `func WithLogSQL(log bool) LoggerOption`
 + `func WithLogOther(log bool) LoggerOption`
++ `func WithSlowThreshold(threshold time.Duration) LoggerOption`
 + `func EnableLogger()`
 + `func DisableLogger()`
 + `func NewSilenceLogger() *SilenceLogger`

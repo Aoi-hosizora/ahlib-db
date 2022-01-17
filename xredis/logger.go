@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/Aoi-hosizora/ahlib/xcolor"
 	"github.com/Aoi-hosizora/ahlib/xstring"
 	"github.com/go-redis/redis/v8"
 	"github.com/sirupsen/logrus"
@@ -15,9 +16,10 @@ import (
 
 // loggerOptions is a type of LogrusLogger and StdLogger's option, each field can be set by LoggerOption function type.
 type loggerOptions struct {
-	logErr bool
-	logCmd bool
-	skip   int
+	logErr        bool
+	logCmd        bool
+	skip          int
+	slowThreshold time.Duration
 }
 
 // LoggerOption represents an option type for LogrusLogger and StdLogger's option, can be created by WithXXX functions.
@@ -41,6 +43,13 @@ func WithLogCmd(log bool) LoggerOption {
 func WithSkip(skip int) LoggerOption {
 	return func(o *loggerOptions) {
 		o.skip = skip
+	}
+}
+
+// WithSlowThreshold creates a LoggerOption to specific a slow operation's duration used to highlight loggers, defaults to 0ms, means no highlight.
+func WithSlowThreshold(threshold time.Duration) LoggerOption {
+	return func(o *loggerOptions) {
+		o.slowThreshold = threshold
 	}
 }
 
@@ -164,7 +173,7 @@ func (l *LogrusLogger) AfterProcess(ctx context.Context, cmd redis.Cmder) error 
 	_, file, line, _ := runtime.Caller(l.option.skip) // defaults to 1
 	source := fmt.Sprintf("%s:%d", file, line)
 
-	p := extractLoggerParam(cmd, du, source)
+	p := extractLoggerParam(cmd, du, source, l.option)
 	m := formatLoggerParam(p)
 	f := fieldifyLoggerParam(p)
 	if p.ErrorMsg != "" && l.option.logErr {
@@ -188,7 +197,7 @@ func (l *StdLogger) AfterProcess(ctx context.Context, cmd redis.Cmder) error {
 	_, file, line, _ := runtime.Caller(l.option.skip) // defaults to 1
 	source := fmt.Sprintf("%s:%d", file, line)
 
-	p := extractLoggerParam(cmd, du, source)
+	p := extractLoggerParam(cmd, du, source, l.option)
 	m := formatLoggerParam(p)
 	if (p.ErrorMsg != "" && l.option.logErr) || (p.ErrorMsg == "" && l.option.logCmd) {
 		l.logger.Print(m)
@@ -226,6 +235,7 @@ type LoggerParam struct {
 	Rows     int64
 	Status   string
 	Duration time.Duration
+	Slow     bool
 	Source   string
 	ErrorMsg string
 }
@@ -239,7 +249,7 @@ var (
 )
 
 // extractLoggerParam extracts and returns LoggerParam using given parameters.
-func extractLoggerParam(cmd redis.Cmder, duration time.Duration, source string) *LoggerParam {
+func extractLoggerParam(cmd redis.Cmder, duration time.Duration, source string, options *loggerOptions) *LoggerParam {
 	err := cmd.Err()
 	isnil := errors.Is(err, redis.Nil)
 	command := render(cmd.Args())
@@ -250,11 +260,13 @@ func extractLoggerParam(cmd redis.Cmder, duration time.Duration, source string) 
 	if !isnil {
 		rows, status = statusFromCmder(cmd)
 	}
+	slow := options.slowThreshold > 0 && duration >= options.slowThreshold
 	return &LoggerParam{
 		Command:  command,
 		Rows:     rows,
 		Status:   status,
 		Duration: duration,
+		Slow:     slow,
 		Source:   source,
 	}
 }
@@ -281,7 +293,11 @@ func formatLoggerParam(p *LoggerParam) string {
 	if first == "" {
 		first = fmt.Sprintf("#=%d", p.Rows)
 	}
-	return fmt.Sprintf("[Redis] %6s | %12s | %s | %s", first, p.Duration.String(), p.Command, p.Source)
+	du := fmt.Sprintf("%12s", p.Duration.String())
+	if p.Slow {
+		du = xcolor.Yellow.WithStyle(xcolor.Bold).Sprintf("%12s", p.Duration.String())
+	}
+	return fmt.Sprintf("[Redis] %6s | %12s | %s | %s", first, du, p.Command, p.Source)
 }
 
 // fieldifyLoggerParam fieldifies given LoggerParam to logrus.Fields for LogrusLogger.

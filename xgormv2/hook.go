@@ -1,4 +1,4 @@
-package xgorm
+package xgormv2
 
 import (
 	"gorm.io/gorm"
@@ -8,10 +8,12 @@ import (
 	"time"
 )
 
-// DefaultDeletedAtTimestamp represents the default value in `gorm` tag of GormTime.DeletedAt.
-const DefaultDeletedAtTimestamp = "1970-01-01 00:00:01"
+const (
+	// DefaultDeletedAtTimestamp represents the default value in `gorm` tag of GormTime.DeletedAt.
+	DefaultDeletedAtTimestamp = "1970-01-01 00:00:01"
 
-const deletedAtFieldName = "DeletedAt"
+	deletedAtFieldName = "DeletedAt"
+)
 
 // GormTime represents a structure of CreatedAt, UpdatedAt, DeletedAt (defaults to DefaultDeletedAtTimestamp), is a replacement of gorm.Model.
 type GormTime struct {
