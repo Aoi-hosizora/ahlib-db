@@ -2,13 +2,18 @@ package xgorm
 
 import (
 	"fmt"
+	"github.com/Aoi-hosizora/ahlib/xstring"
 	"github.com/jinzhu/gorm"
 	"strings"
 	"time"
 )
 
-// DefaultDeletedAtTimestamp represents the default value in `gorm` tag of GormTime.DeletedAt.
-const DefaultDeletedAtTimestamp = "1970-01-01 00:00:01"
+const (
+	// DefaultDeletedAtTimestamp represents the default value in `gorm` tag of GormTime.DeletedAt.
+	DefaultDeletedAtTimestamp = "1970-01-01 00:00:01"
+
+	deletedAtFieldName = "DeletedAt"
+)
 
 // GormTime represents a structure of CreatedAt, UpdatedAt, DeletedAt (defaults to DefaultDeletedAtTimestamp), is a replacement of gorm.Model.
 type GormTime struct {
@@ -23,94 +28,79 @@ type GormTime2 struct {
 	UpdatedAt time.Time
 }
 
-// HookDeletedAt hooks gorm.DB to replace the soft-delete callback (including query, row_query, update, delete), using the new deletedAt timestamp,
-// such as DefaultDeletedAtTimestamp.
-func HookDeletedAt(db *gorm.DB, deletedAtTimestamp string) *gorm.DB {
+// Gorm's callback names, please see gorm.Callback or visit https://github.com/jinzhu/gorm/blob/master/callback.go for more details.
+const (
+	CreateCallbackName   = "gorm:create"
+	UpdateCallbackName   = "gorm:update"
+	DeleteCallbackName   = "gorm:delete"
+	QueryCallbackName    = "gorm:query"
+	RowQueryCallbackName = "gorm:row_query"
+)
+
+// HookDeletedAt hooks gorm.DB's callbacks to make soft deleting to use the new default deletedAt timestamp, such as DefaultDeletedAtTimestamp.
+func HookDeletedAt(db *gorm.DB, defaultTimestamp string) {
 	// query
 	db.Callback().Query().
-		Before("gorm:query").
-		Register("new_deleted_at_before_query_callback", hookedQueryUpdateCallback(deletedAtTimestamp))
+		Before(QueryCallbackName).
+		Register("new_before_query_callback_for_deleted_at", hookedCallback(defaultTimestamp))
 
 	// row query
 	db.Callback().RowQuery().
-		Before("gorm:row_query").
-		Register("new_deleted_at_before_row_query_callback", hookedQueryUpdateCallback(deletedAtTimestamp))
+		Before(RowQueryCallbackName).
+		Register("new_before_row_query_callback_for_deleted_at", hookedCallback(defaultTimestamp))
 
 	// update
 	db.Callback().Update().
-		Before("gorm:update").
-		Register("new_deleted_at_before_update_callback", hookedQueryUpdateCallback(deletedAtTimestamp))
+		Before(UpdateCallbackName).
+		Register("new_before_update_callback_for_deleted_at", hookedCallback(defaultTimestamp))
 
 	// delete <<<
 	db.Callback().Delete().
-		Replace("gorm:delete", hookedDeleteCallback(deletedAtTimestamp))
-
-	return db
+		Replace(DeleteCallbackName, hookedDeleteCallback(defaultTimestamp))
 }
 
-const deletedAtFieldName = "DeletedAt"
-
-// hookedQueryUpdateCallback is a callback for query, row_query and update, used in HookDeletedAt, referred from https://qiita.com/touyu/items/f1ac43b186cd6b26b8c7.
-func hookedQueryUpdateCallback(deletedAtTimestamp string) func(scope *gorm.Scope) {
+// hookedCallback is a callback for gorm:query, gorm:row_query and gorm:update, used in HookDeletedAt.
+func hookedCallback(defaultTimestamp string) func(scope *gorm.Scope) {
+	// https://qiita.com/touyu/items/f1ac43b186cd6b26b8c7
 	return func(scope *gorm.Scope) {
-		var (
-			quotedTableName     = scope.QuotedTableName()
-			deletedAtField, has = scope.FieldByName(deletedAtFieldName)
-		)
-
-		if !scope.HasError() && !scope.Search.Unscoped && has {
-			scope.Search.Unscoped = true
-			sql := fmt.Sprintf("%s.%s = '%s'", quotedTableName, scope.Quote(deletedAtField.DBName), deletedAtTimestamp)
-			scope.Search.Where(sql)
+		if !scope.HasError() && !scope.Search.Unscoped {
+			field, has := scope.FieldByName(deletedAtFieldName)
+			if has {
+				// unscope and use new condition `deleted_at = 'xxx'`
+				scope.Search.Unscoped = true
+				sql := fmt.Sprintf("%s.%s = '%s'", scope.QuotedTableName(), scope.Quote(field.DBName), defaultTimestamp)
+				scope.Search.Where(sql)
+			}
 		}
 	}
 }
 
-// addExtraSpaceIfNotBlank is a string utility function used in hookedDeleteCallback.
-func addExtraSpaceIfNotBlank(s string) string {
-	if s != "" {
-		return " " + s
-	}
-	return ""
-}
-
-// hookedDeleteCallback is a callback for gorm:delete used in HookDeletedAt, referred from https://github.com/jinzhu/gorm/blob/master/callback_delete.go.
-func hookedDeleteCallback(deletedAtTimestamp string) func(scope *gorm.Scope) {
+// hookedDeleteCallback is a callback for gorm:delete used in HookDeletedAt.
+func hookedDeleteCallback(defaultTimestamp string) func(scope *gorm.Scope) {
+	// https://github.com/jinzhu/gorm/blob/master/callback_delete.go#L29
+	// https://github.com/jinzhu/gorm/blob/master/scope.go#L718
 	return func(scope *gorm.Scope) {
-		var extraOption string
-		if str, ok := scope.Get("gorm:delete_option"); ok {
-			extraOption = fmt.Sprint(str)
-		}
-		var (
-			quotedTableName     = scope.QuotedTableName()
-			deletedAtField, has = scope.FieldByName(deletedAtFieldName)
-		)
-
 		if !scope.HasError() {
+			var extraOption string
+			if i, ok := scope.Get("gorm:delete_option"); ok {
+				extraOption = fmt.Sprint(i)
+			}
+			field, has := scope.FieldByName(deletedAtFieldName)
 			if !scope.Search.Unscoped && has {
-				// replace `deleted_at IS NULL` to `deleted_at = 'xxx'`
+				// replace condition `deleted_at IS NULL` to `deleted_at = 'xxx'` and use `SET deleted_at = 'yyy'`
 				var (
-					quotedFieldName = scope.Quote(deletedAtField.DBName)
-					isNullCond      = fmt.Sprintf("%s IS NULL", quotedFieldName)
-					equalCond       = fmt.Sprintf("%s = '%s'", quotedFieldName, deletedAtTimestamp)
-					combCond        = strings.ReplaceAll(scope.CombinedConditionSql(), isNullCond, equalCond)
+					tblName   = scope.QuotedTableName()
+					fieldName = scope.Quote(field.DBName)
+					nowVar    = time.Now().Format("2006-01-02 15:04:05")
+					condition = strings.ReplaceAll(scope.CombinedConditionSql(),
+						fmt.Sprintf("%s.%s IS NULL", tblName, fieldName), fmt.Sprintf("%s.%s = '%s'", tblName, fieldName, defaultTimestamp))
 				)
-				sql := fmt.Sprintf(
-					"UPDATE %v SET %v='%v'%v%v",
-					quotedTableName,
-					quotedFieldName,
-					time.Now().Format("2006-01-02 15:04:05"),
-					addExtraSpaceIfNotBlank(combCond),
-					addExtraSpaceIfNotBlank(extraOption),
-				)
+				sql := fmt.Sprintf("UPDATE %v SET %v='%v'%v%v", tblName, fieldName, nowVar,
+					xstring.ExtraSpaceOnLeftIfNotBlank(condition), xstring.ExtraSpaceOnLeftIfNotBlank(extraOption))
 				scope.Raw(sql).Exec()
 			} else {
-				sql := fmt.Sprintf(
-					"DELETE FROM %v%v%v",
-					scope.QuotedTableName(),
-					addExtraSpaceIfNotBlank(scope.CombinedConditionSql()),
-					addExtraSpaceIfNotBlank(extraOption),
-				)
+				sql := fmt.Sprintf("DELETE FROM %v%v%v", scope.QuotedTableName(),
+					xstring.ExtraSpaceOnLeftIfNotBlank(scope.CombinedConditionSql()), xstring.ExtraSpaceOnLeftIfNotBlank(extraOption))
 				scope.Raw(sql).Exec()
 			}
 		}

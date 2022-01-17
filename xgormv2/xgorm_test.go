@@ -2,13 +2,12 @@ package xgorm
 
 import (
 	"errors"
-	"fmt"
 	"github.com/Aoi-hosizora/ahlib/xstatus"
 	"github.com/Aoi-hosizora/ahlib/xtesting"
 	"github.com/go-sql-driver/mysql"
-	"github.com/jinzhu/gorm"
-	"github.com/lib/pq"
 	"github.com/sirupsen/logrus"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 	"log"
 	"testing"
 	"time"
@@ -22,8 +21,11 @@ func TestMess1(t *testing.T) {
 		"host=localhost port=5432 user=postgres password=123 dbname=db_test")
 
 	xtesting.True(t, IsMySQLDuplicateEntryError(&mysql.MySQLError{Number: MySQLDuplicateEntryErrno}))
-	xtesting.True(t, IsPostgreSQLUniqueViolationError(pq.Error{Code: PostgreSQLUniqueViolationErrno}))
-	xtesting.True(t, IsPostgreSQLUniqueViolationError(&pq.Error{Code: PostgreSQLUniqueViolationErrno}))
+	IsPostgreSQLUniqueViolationError = func(err error) bool {
+		return err.Error() == PostgreSQLUniqueViolationErrno
+	}
+	defer func() { IsPostgreSQLUniqueViolationError = nil }()
+	xtesting.True(t, IsPostgreSQLUniqueViolationError(errors.New("23505")))
 }
 
 var (
@@ -32,19 +34,19 @@ var (
 )
 
 type User struct {
-	Uid  int    `gorm:"primary_key; auto_increment"`
-	Name string `gorm:"type:varchar(12); not null; unique_index:uk_name"`
+	Uid  int    `gorm:"primaryKey; autoIncrement"`
+	Name string `gorm:"type:varchar(12); not null; uniqueIndex:uk_name"`
 	GormTime
 }
 
-func testHook(t *testing.T, giveDialect, giveParam string) {
+func testHook(t *testing.T, giveDialector gorm.Dialector) {
 	l := logrus.New()
 	l.SetFormatter(&logrus.TextFormatter{ForceColors: true, FullTimestamp: true, TimestampFormat: time.RFC3339})
 	check := func(db *gorm.DB, write bool) error {
 		switch {
 		case db.Error != nil:
 			return db.Error
-		case !write && db.RecordNotFound():
+		case !write && IsRecordNotFound(db.Error):
 			return errors.New("record not found")
 		case write && db.RowsAffected == 0:
 			return errors.New("rows affected is zero")
@@ -52,31 +54,39 @@ func testHook(t *testing.T, giveDialect, giveParam string) {
 		return nil
 	}
 
-	db, err := gorm.Open(giveDialect, giveParam)
+	db, err := gorm.Open(giveDialector, &gorm.Config{
+		Logger: logger.New(log.Default(), logger.Config{
+			LogLevel:                  logger.Info,
+			IgnoreRecordNotFoundError: false,
+			Colorful:                  true,
+		}),
+	})
 	if !xtesting.Nil(t, err) {
 		t.FailNow()
 	}
 	_ = CreateCallbackName
-	db.LogMode(true)
-	db.SetLogger(NewLogrusLogger(l))
+	// db.LogMode(true)
+	// db.SetLogger(NewLogrusLogger(l))
 	HookDeletedAt(db, DefaultDeletedAtTimestamp)
-	db.DropTableIfExists(&User{})
-	defer db.DropTableIfExists(&User{})
-	if !xtesting.Nil(t, db.AutoMigrate(&User{}).Error) {
+	db.Migrator().DropTable(&User{})
+	defer db.Migrator().DropTable(&User{})
+	if !xtesting.Nil(t, db.AutoMigrate(&User{})) {
 		t.FailNow()
 	}
 
 	// create
 	user := &User{Uid: 1, Name: "user1"}
 	db.Model(&User{}).Create(user)
-	xtesting.Equal(t, user.DeletedAt.Format("2006-01-02 15:04:05"), DefaultDeletedAtTimestamp)
+	if user.DeletedAt.Valid { // <<<
+		xtesting.Equal(t, user.DeletedAt.Time.Format("2006-01-02 15:04:05"), DefaultDeletedAtTimestamp)
+	}
 
 	// query
 	user = &User{}
 	xtesting.Nil(t, check(db.Model(&User{}).Where(&User{Uid: 1}).First(user), false))
 	xtesting.Equal(t, user.Uid, 1)
 	xtesting.Equal(t, user.Name, "user1")
-	xtesting.Equal(t, user.DeletedAt.Format("2006-01-02 15:04:05"), DefaultDeletedAtTimestamp)
+	xtesting.Equal(t, user.DeletedAt.Time.Format("2006-01-02 15:04:05"), DefaultDeletedAtTimestamp)
 
 	// update
 	xtesting.Nil(t, check(db.Model(&User{Uid: 1}).Updates(&User{Name: "user1_new"}), true))
@@ -90,27 +100,33 @@ func testHook(t *testing.T, giveDialect, giveParam string) {
 	user = &User{}
 	xtesting.NotNil(t, check(db.Model(&User{}).Where(&User{Uid: 1}).First(user), false))
 	xtesting.Nil(t, check(db.Unscoped().Model(&User{}).Where(&User{Uid: 1}).First(user), false))
-	xtesting.NotEqual(t, user.DeletedAt.Format("2006-01-02 15:04:05"), DefaultDeletedAtTimestamp)
+	xtesting.NotEqual(t, user.DeletedAt.Time.Format("2006-01-02 15:04:05"), DefaultDeletedAtTimestamp)
 
 	// hard delete
 	xtesting.Nil(t, check(db.Unscoped().Model(&User{}).Delete(&User{Uid: 1}), true))
 	xtesting.NotNil(t, check(db.Unscoped().Model(&User{}).Where(&User{Uid: 1}).First(&User{}), false))
 }
 
-func testHelper(t *testing.T, giveDialect, giveParam string) {
+func testHelper(t *testing.T, giveDialector gorm.Dialector) {
 	l := logrus.New()
 	l.SetFormatter(&logrus.TextFormatter{ForceColors: true, FullTimestamp: true, TimestampFormat: time.RFC3339})
 
-	db, err := gorm.Open(giveDialect, giveParam)
+	db, err := gorm.Open(giveDialector, &gorm.Config{
+		Logger: logger.New(log.Default(), logger.Config{
+			LogLevel:                  logger.Info,
+			IgnoreRecordNotFoundError: false,
+			Colorful:                  true,
+		}),
+	})
 	if !xtesting.Nil(t, err) {
 		t.FailNow()
 	}
-	db.LogMode(true)
-	db.SetLogger(NewLogrusLogger(l))
+	// db.LogMode(true)
+	// db.SetLogger(NewLogrusLogger(l))
 	HookDeletedAt(db, DefaultDeletedAtTimestamp)
-	db.DropTableIfExists(&User{})
-	defer db.DropTableIfExists(&User{})
-	if !xtesting.Nil(t, db.AutoMigrate(&User{}).Error) {
+	db.Migrator().DropTable(&User{})
+	defer db.Migrator().DropTable(&User{})
+	if !xtesting.Nil(t, db.AutoMigrate(&User{})) {
 		t.FailNow()
 	}
 
@@ -191,78 +207,5 @@ func testHelper(t *testing.T, giveDialect, giveParam string) {
 		{"username desc, age desc", dict, "firstname DESC, lastname DESC, birthday ASC"},
 	} {
 		xtesting.Equal(t, GenerateOrderByExp(tc.giveSource, tc.giveDict), tc.want)
-	}
-}
-
-func testLogger(t *testing.T, giveDialect, giveParam string) {
-	l1 := logrus.New()
-	l1.SetFormatter(&logrus.TextFormatter{ForceColors: true, FullTimestamp: true, TimestampFormat: time.RFC3339})
-	l2 := log.Default()
-
-	for _, tc := range []struct {
-		name   string
-		mode   bool
-		enable bool
-		custom bool
-		logger ILogger
-	}{
-		// {"default", true, true, false, nil},
-		{"disable_mode", false, true, false, nil},
-		{"silence", true, true, false, NewSilenceLogger()},
-		//
-		{"logrus", true, true, false, NewLogrusLogger(l1)},
-		{"logrus_custom", true, true, true, NewLogrusLogger(l1)},
-		{"logrus_no_info_other", true, true, false, NewLogrusLogger(l1, WithLogInfo(false), WithLogOther(false))},
-		{"logrus_no_sql", true, true, false, NewLogrusLogger(l1, WithLogSQL(false))},
-		{"logrus_disable", true, false, false, NewLogrusLogger(l1)},
-		//
-		{"stdlog", true, true, false, NewStdLogger(l2)},
-		{"stdlog_custom", true, true, true, NewStdLogger(l2)},
-		{"stdlog_no_xxx", true, true, false, NewStdLogger(l2, WithLogInfo(false), WithLogSQL(false), WithLogOther(false))},
-		{"stdlog_disable", true, false, false, NewStdLogger(l2)},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			db, err := gorm.Open(giveDialect, giveParam)
-			if !xtesting.Nil(t, err) {
-				t.FailNow()
-			}
-			db.LogMode(tc.mode)
-			if tc.enable {
-				EnableLogger()
-			} else {
-				DisableLogger()
-			}
-			if tc.logger != nil {
-				db.SetLogger(tc.logger)
-			}
-			if tc.custom {
-				FormatLoggerFunc = func(p *LoggerParam) string {
-					if p.Type != "sql" {
-						return fmt.Sprintf("[Gorm] msg: %s", p.Message)
-					}
-					return fmt.Sprintf("[Gorm] %7d - %12s - %s - %s", p.Rows, p.Duration.String(), p.SQL, p.Source)
-				}
-				FieldifyLoggerFunc = func(p *LoggerParam) logrus.Fields {
-					return logrus.Fields{"module": "gorm", "type": p.Type}
-				}
-				defer func() {
-					FormatLoggerFunc = nil
-					FieldifyLoggerFunc = nil
-				}()
-			}
-
-			HookDeletedAt(db, DefaultDeletedAtTimestamp) // log [info]
-			db.DropTableIfExists(&User{})
-			defer db.DropTableIfExists(&User{})
-			if !xtesting.Nil(t, db.AutoMigrate(&User{}).Error) {
-				t.FailNow()
-			}
-
-			db.Create(&User{Uid: 1, Name: "user1"})
-			db.Create(&User{Uid: 1, Name: "user1"}) // log [log]
-			db.Model(&User{}).Where(&User{Uid: 1}).First(&User{})
-			db.Model(&User{}).Where("name = ? OR name = ?", []byte("user1"), []byte{0x00, 0x01}).First(&User{}) // ?
-			db.Model(&User{}).Where("deleted_at = $1 OR deleted_at = $2", time.Time{}, nil).First(&User{})      // $
-		})
 	}
 }

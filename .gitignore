@@ -4,8 +4,12 @@
 .history/
 .idea/
 
-### Project ###
+### Build ###
 build/
+coverage.txt
+profile.out
+
+### Project ###
 *.sql
 *.sql-journal
 *.cypher

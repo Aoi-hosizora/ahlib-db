@@ -6,7 +6,8 @@
 [![License](http://img.shields.io/badge/license-mit-blue.svg)](./LICENSE)
 [![Release](https://img.shields.io/github/v/release/Aoi-hosizora/ahlib-db)](https://github.com/Aoi-hosizora/ahlib-db/releases)
 
-+ A personal golang library for db development, including gorm (mysql, sqlite, postgresql), redis (go-redis), neo4j (neo4j-go-driver/v1), require `Go >= 1.15`.
++ A personal golang library for db development, including gorm / gormv2 (mysql, sqlite, postgres), redis (go-redis),
+  neo4j (neo4j-go-driver/v1), require `Go >= 1.15`.
 
 ### Related libraries
 
@@ -18,6 +19,7 @@
 ### Packages
 
 + xgorm
++ xgormv2
 + xneo4j
 + xredis
 
@@ -32,6 +34,18 @@
 + `github.com/VividCortex/mysqlerr v1.0.0`
 + `github.com/mattn/go-sqlite3 v1.14.0`
 + `github.com/lib/pq v1.1.1`
++ `github.com/sirupsen/logrus v1.8.1`
+
+#### xgormv2
+
++ See [go.mod](./xgormv2/go.mod) and [go.sum](./xgormv2/go.sum)
++ `github.com/Aoi-hosizora/ahlib v1.6.0`
++ `gorm.io/gorm v1.22.4`
++ `gorm.io/driver/mysql v1.2.3`
++ `gorm.io/driver/sqlite v1.2.6`
++ `github.com/go-sql-driver/mysql v1.6.0`
++ `github.com/VividCortex/mysqlerr v1.0.0`
++ `github.com/mattn/go-sqlite3 v1.14.9`
 + `github.com/sirupsen/logrus v1.8.1`
 
 #### xneo4j

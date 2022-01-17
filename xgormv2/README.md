@@ -1,14 +1,9 @@
-# xgorm
+# xgormv2
 
 ## Dependencies
 
 + github.com/Aoi-hosizora/ahlib
-+ github.com/jinzhu/gorm
-+ github.com/go-sql-driver/mysql
-+ github.com/VividCortex/mysqlerr
-+ github.com/mattn/go-sqlite3 (cgo)
-+ github.com/lib/pq
-+ github.com/sirupsen/logrus
++ ...
 
 ## Documents
 
