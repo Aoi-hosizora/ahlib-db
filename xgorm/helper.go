@@ -25,23 +25,28 @@ const (
 	Postgres = "postgres"
 )
 
-// IsMySQL checks if the dialect of given gorm.DB is "mysql".
+// IsMySQL checks whether the dialect of given gorm.DB is "mysql".
 func IsMySQL(db *gorm.DB) bool {
 	return db.Dialect().GetName() == MySQL
 }
 
-// IsSQLite checks if the dialect of given gorm.DB is "sqlite3".
+// IsSQLite checks whether the dialect of given gorm.DB is "sqlite3".
 func IsSQLite(db *gorm.DB) bool {
 	return db.Dialect().GetName() == SQLite
 }
 
-// IsPostgreSQL checks if the dialect of given gorm.DB is "postgres".
+// IsPostgreSQL checks whether the dialect of given gorm.DB is "postgres".
 func IsPostgreSQL(db *gorm.DB) bool {
 	return db.Dialect().GetName() == Postgres
 }
 
 // MySQLConfig is an alias type of mysql.Config, can be used to generate dsl by FormatDSN method.
 type MySQLConfig = mysql.Config
+
+// MySQLDefaultCharsetTimeLocParam returns a map as mysql.Config's Param value, it contains the default "utf8mb4" charset, "True" parseTime, and "Local" loc.
+func MySQLDefaultCharsetTimeLocParam() map[string]string {
+	return map[string]string{"charset": "utf8mb4", "parseTime": "True", "loc": "Local"}
+}
 
 // MySQLDefaultDsn returns the MySQL dsn from given parameters with "utf8mb4" charset and "local" location. If you want to set more options in dsn,
 // please use mysql.Config or xgorm.MySQLConfig. For more information, please visit https://github.com/go-sql-driver/mysql#dsn-data-source-name.
@@ -74,13 +79,13 @@ const (
 	PostgreSQLUniqueViolationErrno = "23505"
 )
 
-// IsMySQLDuplicateEntryError checks if err is MySQL's ER_DUP_ENTRY error, its error code is MySQLDuplicateEntryErrno.
+// IsMySQLDuplicateEntryError checks whether err is MySQL's ER_DUP_ENTRY error, its error code is MySQLDuplicateEntryErrno.
 func IsMySQLDuplicateEntryError(err error) bool {
 	e, ok := err.(*mysql.MySQLError)
 	return ok && e.Number == MySQLDuplicateEntryErrno
 }
 
-// IsPostgreSQLUniqueViolationError checks if err is PostgreSQL's unique_violation error, its error code is PostgreSQLUniqueViolationErrno.
+// IsPostgreSQLUniqueViolationError checks whether err is PostgreSQL's unique_violation error, its error code is PostgreSQLUniqueViolationErrno.
 func IsPostgreSQLUniqueViolationError(err error) bool {
 	e, ok := err.(pq.Error)
 	if ok {

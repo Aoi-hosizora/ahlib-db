@@ -274,7 +274,7 @@ func extractLoggerParam(cmd redis.Cmder, duration time.Duration, source string, 
 // formatLoggerParam formats given LoggerParam to string for LogrusLogger and StdLogger.
 //
 // The default format logs like:
-// 	[Redis] ERR invalid password | SET test_a test_aaa | F:/Projects/ahlib-db/xredis/redis_test.go:41
+// 	[Redis] err: ERR invalid password | SET test_a test_aaa | F:/Projects/ahlib-db/xredis/redis_test.go:41
 // 	[Redis]    Nil |   305.9909ms | GET test | F:/Projects/ahlib-db/xredis/redis_test.go:126
 // 	[Redis]      3 |      995.5µs | KEYS tes* | F:/Projects/ahlib-db/xredis/redis_test.go:146
 // 	[Redis]     2i |      997.8µs | DEL test_ test_c | F:/Projects/ahlib-db/xredis/helper.go:21
@@ -287,7 +287,7 @@ func formatLoggerParam(p *LoggerParam) string {
 		return FormatLoggerFunc(p)
 	}
 	if p.ErrorMsg != "" {
-		return fmt.Sprintf("[Redis] %v | %s | %s", p.ErrorMsg, p.Command, p.Source)
+		return fmt.Sprintf("[Redis] err: %v | %s | %s", p.ErrorMsg, p.Command, p.Source)
 	}
 	first := p.Status // # | status (OK, Nil, T, F, Str, ...)
 	if first == "" {
@@ -334,14 +334,14 @@ func render(args []interface{}) string {
 	sb := strings.Builder{}
 	sb.WriteString(strings.ToUpper(args[0].(string)))
 	for _, arg := range args[1:] {
-		s := ""
-		if s, ok := arg.(string); ok && strings.Contains(s, " ") {
-			s = fmt.Sprintf("'%s'", s)
+		cmd := ""
+		if argStr, ok := arg.(string); ok && strings.Contains(argStr, " ") {
+			cmd = fmt.Sprintf("'%s'", argStr)
 		} else {
-			s = fmt.Sprintf("%v", arg)
+			cmd = fmt.Sprintf("%v", arg)
 		}
 		sb.WriteRune(' ')
-		sb.WriteString(s)
+		sb.WriteString(cmd)
 	}
 	return sb.String()
 }

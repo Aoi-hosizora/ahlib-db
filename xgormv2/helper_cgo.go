@@ -9,7 +9,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// IsSQLiteUniqueConstraintError checks if err is SQLite's ErrConstraintUnique error, its error extended code is SQLiteUniqueConstraintErrno.
+// IsSQLiteUniqueConstraintError checks whether err is SQLite's ErrConstraintUnique error, its error extended code is SQLiteUniqueConstraintErrno.
 func IsSQLiteUniqueConstraintError(err error) bool {
 	e, ok := err.(sqlite3.Error)
 	if ok {

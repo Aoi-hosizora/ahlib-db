@@ -53,6 +53,7 @@
 + `func IsMySQL(db *gorm.DB) bool`
 + `func IsSQLite(db *gorm.DB) bool`
 + `func IsPostgreSQL(db *gorm.DB) bool`
++ `func MySQLDefaultCharsetTimeLocParam() map[string]string`
 + `func MySQLDefaultDsn(username, password, address, database string) string`
 + `func SQLiteDefaultDsn(filename string) string`
 + `func PostgresDefaultDsn(username, password, host string, port int, database string) string`

@@ -27,7 +27,7 @@ type P map[string]interface{}
 // 	cypher := "MATCH p = ()-[r :FRIEND]->(n) RETURN r, n"
 // 	records, summary, err := xneo4j.Collect(session.Run(cypher, nil)) // err contains the connection and execution error
 // 	for _, record := range records { // records is a slice of neo4j.Record
-// 		// record is the returned values, each value can be got by `Get` or `GetByIndex` methods
+// 		// record is returned values, each value can be got by `Get` or `GetByIndex` methods
 // 		rel := xneo4j.GetRel(record.GetByIndex(0))   // neo4j.Relationship
 // 		node := xneo4j.GetNode(record.GetByIndex(1)) // neo4j.Node
 // 	}

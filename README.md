@@ -1,13 +1,14 @@
 # ahlib-db
 
 [![Build Status](https://travis-ci.com/Aoi-hosizora/ahlib-db.svg?branch=master)](https://travis-ci.com/Aoi-hosizora/ahlib-db)
-[![codecov](https://codecov.io/gh/Aoi-hosizora/ahlib-db/branch/master/graph/badge.svg)](https://codecov.io/gh/Aoi-hosizora/ahlib-db)
+[![Codecov](https://codecov.io/gh/Aoi-hosizora/ahlib-db/branch/master/graph/badge.svg)](https://codecov.io/gh/Aoi-hosizora/ahlib-db)
 [![Go Report Card](https://goreportcard.com/badge/github.com/Aoi-hosizora/ahlib-db)](https://goreportcard.com/report/github.com/Aoi-hosizora/ahlib-db)
 [![License](http://img.shields.io/badge/license-mit-blue.svg)](./LICENSE)
 [![Release](https://img.shields.io/github/v/release/Aoi-hosizora/ahlib-db)](https://github.com/Aoi-hosizora/ahlib-db/releases)
+[![Go Reference](https://pkg.go.dev/badge/github.com/Aoi-hosizora/ahlib-db.svg)](https://pkg.go.dev/github.com/Aoi-hosizora/ahlib-db)
 
-+ A personal golang library for db development, including gorm / gormv2 (mysql, sqlite, postgres), redis (go-redis),
-  neo4j (neo4j-go-driver/v1), require `Go >= 1.15`.
++ A personal golang library for db development, including: mysql+sqlite+postgres ([gorm (v1)](https://github.com/jinzhu/gorm) / [gorm (v2)](https://github.com/go-gorm/gorm)),
+  redis ([go-redis](https://github.com/go-redis/redis)), neo4j ([neo4j-go-driver (v1)](https://github.com/neo4j/neo4j-go-driver)), requires `Go >= 1.15`.
 
 ### Related libraries
 

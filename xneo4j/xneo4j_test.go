@@ -183,7 +183,7 @@ func TestPool(t *testing.T) {
 	session := check(pool.Dial(neo4j.AccessModeRead))
 	records, summary, err := Collect(session.Run(`MATCH (n :XNEO4J_TEST) RETURN n`, nil))
 	xtesting.Nil(t, err)
-	xtesting.Empty(t, records)
+	xtesting.ZeroLen(t, records)
 	xtesting.Equal(t, summary.Counters().NodesCreated(), 0)
 
 	// merge
@@ -219,7 +219,7 @@ func TestPool(t *testing.T) {
 		session := check(pool.Dial(neo4j.AccessModeRead))
 		records, _, err := Collect(session.Run(`MATCH (n :XNEO4J_TEST) RETURN n`, nil))
 		xtesting.Nil(t, err)
-		xtesting.Empty(t, records)
+		xtesting.ZeroLen(t, records)
 	})
 	target := pool.Target()
 	xtesting.Equal(t, target.String(), neo4jTarget)
