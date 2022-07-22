@@ -4,6 +4,7 @@ go 1.15
 
 require (
 	github.com/Aoi-hosizora/ahlib v0.0.0-00010101000000-000000000000
+	github.com/Aoi-hosizora/ahlib-db/xdbutils v0.0.0-00010101000000-000000000000
 	github.com/VividCortex/mysqlerr v1.0.0
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/mattn/go-sqlite3 v1.14.9
@@ -13,4 +14,7 @@ require (
 	gorm.io/gorm v1.22.4
 )
 
-replace github.com/Aoi-hosizora/ahlib => ../../ahlib
+replace (
+	github.com/Aoi-hosizora/ahlib => ../../ahlib
+	github.com/Aoi-hosizora/ahlib-db/xdbutils => ./../xdbutils
+)

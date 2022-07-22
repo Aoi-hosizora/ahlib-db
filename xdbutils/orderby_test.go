@@ -1,11 +1,11 @@
-package internal
+package xdbutils
 
 import (
 	"github.com/Aoi-hosizora/ahlib/xtesting"
 	"testing"
 )
 
-func TestGenerateOrderByExp(t *testing.T) {
+func TestGenerateOrderByExpr(t *testing.T) {
 	dict := PropertyDict{
 		"uid":      NewPropertyValue(false, "uid"),
 		"username": NewPropertyValue(false, "firstname", "lastname"),
@@ -51,6 +51,6 @@ func TestGenerateOrderByExp(t *testing.T) {
 		{"username desc, age", dict, "firstname DESC, lastname DESC, birthday DESC"},
 		{"username, age desc", dict, "firstname ASC, lastname ASC, birthday ASC"},
 	} {
-		xtesting.Equal(t, GenerateOrderByExp(tc.giveSource, tc.giveDict), tc.want)
+		xtesting.Equal(t, GenerateOrderByExpr(tc.giveSource, tc.giveDict), tc.want)
 	}
 }

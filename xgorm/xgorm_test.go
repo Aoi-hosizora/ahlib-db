@@ -195,7 +195,7 @@ func testHelper(t *testing.T, giveDialect, giveParam string) {
 		{"uid, username", dict, "uid ASC, firstname ASC, lastname ASC"},
 		{"username desc, age desc", dict, "firstname DESC, lastname DESC, birthday ASC"},
 	} {
-		xtesting.Equal(t, GenerateOrderByExp(tc.giveSource, tc.giveDict), tc.want)
+		xtesting.Equal(t, GenerateOrderByExpr(tc.giveSource, tc.giveDict), tc.want)
 	}
 }
 

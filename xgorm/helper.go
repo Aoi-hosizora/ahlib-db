@@ -2,7 +2,7 @@ package xgorm
 
 import (
 	"fmt"
-	"github.com/Aoi-hosizora/ahlib-db/xgorm/internal"
+	"github.com/Aoi-hosizora/ahlib-db/xdbutils"
 	"github.com/Aoi-hosizora/ahlib/xstatus"
 	"github.com/VividCortex/mysqlerr"
 	"github.com/go-sql-driver/mysql"
@@ -79,13 +79,13 @@ const (
 	PostgreSQLUniqueViolationErrno = "23505"
 )
 
-// IsMySQLDuplicateEntryError checks whether err is MySQL's ER_DUP_ENTRY error, its error code is MySQLDuplicateEntryErrno.
+// IsMySQLDuplicateEntryError checks whether err is MySQL's ER_DUP_ENTRY error, whose error code is MySQLDuplicateEntryErrno.
 func IsMySQLDuplicateEntryError(err error) bool {
 	e, ok := err.(*mysql.MySQLError)
 	return ok && e.Number == MySQLDuplicateEntryErrno
 }
 
-// IsPostgreSQLUniqueViolationError checks whether err is PostgreSQL's unique_violation error, its error code is PostgreSQLUniqueViolationErrno.
+// IsPostgreSQLUniqueViolationError checks whether err is PostgreSQL's unique_violation error, whose error code is PostgreSQLUniqueViolationErrno.
 func IsPostgreSQLUniqueViolationError(err error) bool {
 	e, ok := err.(pq.Error)
 	if ok {
@@ -121,22 +121,22 @@ func DeleteErr(rdb *gorm.DB) (xstatus.DbStatus, error) {
 	return xstatus.DbSuccess, nil
 }
 
-// PropertyValue is a struct type of database entity's property mapping rule, used in GenerateOrderByExp.
-type PropertyValue = internal.PropertyValue
+// PropertyValue is a struct type of database entity's property mapping rule, used in GenerateOrderByExpr.
+type PropertyValue = xdbutils.PropertyValue
 
-// PropertyDict is a dictionary type to store pairs from data transfer object to database entity's PropertyValue, used in GenerateOrderByExp.
-type PropertyDict = internal.PropertyDict
+// PropertyDict is a dictionary type to store pairs from data transfer object to database entity's PropertyValue, used in GenerateOrderByExpr.
+type PropertyDict = xdbutils.PropertyDict
 
 // NewPropertyValue creates a PropertyValue by given reverse and destinations, used to describe database entity's property mapping rule.
 //
 // Here:
-// 1. `destinations` represent mapping property destination array, use `property_name` directly for sql, use `returned_name.property_name` for cypher.
+// 1. `destinations` represents mapping property destination array, use `property_name` directly for sql, use `returned_name.property_name` for cypher.
 // 2. `reverse` represents the flag whether you need to revert the order or not.
 func NewPropertyValue(reverse bool, destinations ...string) *PropertyValue {
-	return internal.NewPropertyValue(reverse, destinations...)
+	return xdbutils.NewPropertyValue(reverse, destinations...)
 }
 
-// GenerateOrderByExp returns a generated order-by expression by given source (query string) order string (such as "name desc, age asc") and PropertyDict.
+// GenerateOrderByExpr returns a generated order-by expression by given source (query string) order string (such as "name desc, age asc") and PropertyDict.
 // The generated expression is in mysql-sql or neo4j-cypher style (such as "xxx ASC" or "xxx.yyy DESC").
 //
 // Example:
@@ -145,8 +145,8 @@ func NewPropertyValue(reverse bool, destinations ...string) *PropertyValue {
 // 		"name": NewPropertyValue(false, "firstname", "lastname"),
 // 		"age":  NewPropertyValue(true, "birthday"),
 // 	}
-// 	_ = GenerateOrderByExp(`uid, age desc`, dict) // => uid ASC, birthday ASC
-// 	_ = GenerateOrderByExp(`age, username desc`, dict) // => birthday DESC, firstname DESC, lastname DESC
-func GenerateOrderByExp(source string, dict PropertyDict) string {
-	return internal.GenerateOrderByExp(source, dict)
+// 	_ = GenerateOrderByExpr(`uid, age desc`, dict) // => uid ASC, birthday ASC
+// 	_ = GenerateOrderByExpr(`age, username desc`, dict) // => birthday DESC, firstname DESC, lastname DESC
+func GenerateOrderByExpr(source string, dict PropertyDict) string {
+	return xdbutils.GenerateOrderByExpr(source, dict)
 }

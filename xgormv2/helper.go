@@ -3,7 +3,7 @@ package xgormv2
 import (
 	"errors"
 	"fmt"
-	"github.com/Aoi-hosizora/ahlib-db/xgormv2/internal"
+	"github.com/Aoi-hosizora/ahlib-db/xdbutils"
 	"github.com/Aoi-hosizora/ahlib/xstatus"
 	"github.com/VividCortex/mysqlerr"
 	"github.com/go-sql-driver/mysql"
@@ -30,7 +30,7 @@ func IsMySQL(db *gorm.DB) bool {
 	return db.Dialector.Name() == MySQL
 }
 
-// IsSQLite checks whether the dialect of given gorm.DB is "sqlite3".
+// IsSQLite checks whether the dialect of given gorm.DB is "sqlite".
 func IsSQLite(db *gorm.DB) bool {
 	return db.Dialector.Name() == SQLite
 }
@@ -49,7 +49,7 @@ func MySQLDefaultCharsetTimeLocParam() map[string]string {
 }
 
 // MySQLDefaultDsn returns the MySQL dsn from given parameters with "utf8mb4" charset and "local" location. If you want to set more options in dsn,
-// please use mysql.Config or xgorm.MySQLConfig. For more information, please visit https://github.com/go-sql-driver/mysql#dsn-data-source-name.
+// please use mysql.Config or xgormv2.MySQLConfig. For more information, please visit https://github.com/go-sql-driver/mysql#dsn-data-source-name.
 func MySQLDefaultDsn(username, password, address, database string) string {
 	return fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8mb4&parseTime=True&loc=Local", username, password, address, database)
 }
@@ -79,19 +79,19 @@ const (
 	PostgreSQLUniqueViolationErrno = "23505"
 )
 
-// IsMySQLDuplicateEntryError checks whether err is MySQL's ER_DUP_ENTRY error, its error code is MySQLDuplicateEntryErrno.
+// IsMySQLDuplicateEntryError checks whether err is MySQL's ER_DUP_ENTRY error, whose error code is MySQLDuplicateEntryErrno.
 func IsMySQLDuplicateEntryError(err error) bool {
 	e, ok := err.(*mysql.MySQLError)
 	return ok && e.Number == MySQLDuplicateEntryErrno
 }
 
-// IsPostgreSQLUniqueViolationError is a variable that used to check whether err is PostgreSQL's unique_violation error. Note that its error code is PostgreSQLUniqueViolationErrno.
+// IsPostgreSQLUniqueViolationError is a variable that used to check whether err is PostgreSQL's unique_violation error, whose error code is PostgreSQLUniqueViolationErrno.
 //
 // Example:
 // 	import "github.com/jackc/pgconn"
-// 	IsPostgreSQLUniqueViolationError = func(err error) bool {
+// 	xgormv2.IsPostgreSQLUniqueViolationError = func(err error) bool {
 // 		perr, ok := err.(*pgconn.PgError)
-// 		return ok && perr.Code == PostgreSQLUniqueViolationErrno
+// 		return ok && perr.Code == xgormv2.PostgreSQLUniqueViolationErrno
 // 	}
 var IsPostgreSQLUniqueViolationError func(err error) bool
 
@@ -99,7 +99,7 @@ var IsPostgreSQLUniqueViolationError func(err error) bool
 // CRUD and other
 // ==============
 
-// IsRecordNotFound checks given error from gorm.DB is gorm.ErrRecordNotFound.
+// IsRecordNotFound checks whether given error from gorm.DB is gorm.ErrRecordNotFound.
 func IsRecordNotFound(err error) bool {
 	return errors.Is(err, gorm.ErrRecordNotFound)
 }
@@ -126,22 +126,22 @@ func DeleteErr(rdb *gorm.DB) (xstatus.DbStatus, error) {
 	return xstatus.DbSuccess, nil
 }
 
-// PropertyValue is a struct type of database entity's property mapping rule, used in GenerateOrderByExp.
-type PropertyValue = internal.PropertyValue
+// PropertyValue is a struct type of database entity's property mapping rule, used in GenerateOrderByExpr.
+type PropertyValue = xdbutils.PropertyValue
 
-// PropertyDict is a dictionary type to store pairs from data transfer object to database entity's PropertyValue, used in GenerateOrderByExp.
-type PropertyDict = internal.PropertyDict
+// PropertyDict is a dictionary type to store pairs from data transfer object to database entity's PropertyValue, used in GenerateOrderByExpr.
+type PropertyDict = xdbutils.PropertyDict
 
 // NewPropertyValue creates a PropertyValue by given reverse and destinations, used to describe database entity's property mapping rule.
 //
 // Here:
-// 1. `destinations` represent mapping property destination array, use `property_name` directly for sql, use `returned_name.property_name` for cypher.
+// 1. `destinations` represents mapping property destination array, use `property_name` directly for sql, use `returned_name.property_name` for cypher.
 // 2. `reverse` represents the flag whether you need to revert the order or not.
 func NewPropertyValue(reverse bool, destinations ...string) *PropertyValue {
-	return internal.NewPropertyValue(reverse, destinations...)
+	return xdbutils.NewPropertyValue(reverse, destinations...)
 }
 
-// GenerateOrderByExp returns a generated order-by expression by given source (query string) order string (such as "name desc, age asc") and PropertyDict.
+// GenerateOrderByExpr returns a generated order-by expression by given source (query string) order string (such as "name desc, age asc") and PropertyDict.
 // The generated expression is in mysql-sql or neo4j-cypher style (such as "xxx ASC" or "xxx.yyy DESC").
 //
 // Example:
@@ -150,8 +150,8 @@ func NewPropertyValue(reverse bool, destinations ...string) *PropertyValue {
 // 		"name": NewPropertyValue(false, "firstname", "lastname"),
 // 		"age":  NewPropertyValue(true, "birthday"),
 // 	}
-// 	_ = GenerateOrderByExp(`uid, age desc`, dict) // => uid ASC, birthday ASC
-// 	_ = GenerateOrderByExp(`age, username desc`, dict) // => birthday DESC, firstname DESC, lastname DESC
-func GenerateOrderByExp(source string, dict PropertyDict) string {
-	return internal.GenerateOrderByExp(source, dict)
+// 	_ = GenerateOrderByExpr(`uid, age desc`, dict) // => uid ASC, birthday ASC
+// 	_ = GenerateOrderByExpr(`age, username desc`, dict) // => birthday DESC, firstname DESC, lastname DESC
+func GenerateOrderByExpr(source string, dict PropertyDict) string {
+	return xdbutils.GenerateOrderByExpr(source, dict)
 }

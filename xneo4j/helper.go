@@ -1,7 +1,7 @@
 package xneo4j
 
 import (
-	"github.com/Aoi-hosizora/ahlib-db/xneo4j/internal"
+	"github.com/Aoi-hosizora/ahlib-db/xdbutils"
 	"github.com/neo4j/neo4j-go-driver/neo4j"
 	"time"
 )
@@ -135,22 +135,22 @@ func GetDuration(data interface{}) neo4j.Duration {
 // order by
 // ========
 
-// PropertyValue is a struct type of database entity's property mapping rule, used in GenerateOrderByExp.
-type PropertyValue = internal.PropertyValue
+// PropertyValue is a struct type of database entity's property mapping rule, used in GenerateOrderByExpr.
+type PropertyValue = xdbutils.PropertyValue
 
-// PropertyDict is a dictionary type to store pairs from data transfer object to database entity's PropertyValue, used in GenerateOrderByExp.
-type PropertyDict = internal.PropertyDict
+// PropertyDict is a dictionary type to store pairs from data transfer object to database entity's PropertyValue, used in GenerateOrderByExpr.
+type PropertyDict = xdbutils.PropertyDict
 
 // NewPropertyValue creates a PropertyValue by given reverse and destinations, used to describe database entity's property mapping rule.
 //
 // Here:
-// 1. `destinations` represent mapping property destination array, use `property_name` directly for sql, use `returned_name.property_name` for cypher.
+// 1. `destinations` represents mapping property destination array, use `property_name` directly for sql, use `returned_name.property_name` for cypher.
 // 2. `reverse` represents the flag whether you need to revert the order or not.
 func NewPropertyValue(reverse bool, destinations ...string) *PropertyValue {
-	return internal.NewPropertyValue(reverse, destinations...)
+	return xdbutils.NewPropertyValue(reverse, destinations...)
 }
 
-// GenerateOrderByExp returns a generated order-by expression by given source (query string) order string (such as "name desc, age asc") and PropertyDict.
+// GenerateOrderByExpr returns a generated order-by expression by given source (query string) order string (such as "name desc, age asc") and PropertyDict.
 // The generated expression is in mysql-sql or neo4j-cypher style (such as "xxx ASC" or "xxx.yyy DESC").
 //
 // Example:
@@ -159,10 +159,10 @@ func NewPropertyValue(reverse bool, destinations ...string) *PropertyValue {
 // 		"name": NewPropertyValue(false, "p.firstname", "p.lastname"),
 // 		"age":  NewPropertyValue(true, "u.birthday"),
 // 	}
-// 	_ = GenerateOrderByExp(`uid, age desc`, dict) // => p.uid ASC, u.birthday ASC
-// 	_ = GenerateOrderByExp(`age, username desc`, dict) // => u.birthday DESC, p.firstname DESC, p.lastname DESC
-func GenerateOrderByExp(source string, dict PropertyDict) string {
-	return internal.GenerateOrderByExp(source, dict)
+// 	_ = GenerateOrderByExpr(`uid, age desc`, dict) // => p.uid ASC, u.birthday ASC
+// 	_ = GenerateOrderByExpr(`age, username desc`, dict) // => u.birthday DESC, p.firstname DESC, p.lastname DESC
+func GenerateOrderByExpr(source string, dict PropertyDict) string {
+	return xdbutils.GenerateOrderByExpr(source, dict)
 }
 
 // ====================

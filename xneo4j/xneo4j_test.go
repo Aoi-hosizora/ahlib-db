@@ -123,7 +123,7 @@ func TestHelper(t *testing.T) {
 			{"uid, username", dict, "n.uid ASC, n.firstname ASC, n.lastname ASC"},
 			{"username desc, age desc", dict, "n.firstname DESC, n.lastname DESC, r.birthday ASC"},
 		} {
-			xtesting.Equal(t, GenerateOrderByExp(tc.giveSource, tc.giveDict), tc.want)
+			xtesting.Equal(t, GenerateOrderByExpr(tc.giveSource, tc.giveDict), tc.want)
 		}
 	})
 
@@ -183,7 +183,7 @@ func TestPool(t *testing.T) {
 	session := check(pool.Dial(neo4j.AccessModeRead))
 	records, summary, err := Collect(session.Run(`MATCH (n :XNEO4J_TEST) RETURN n`, nil))
 	xtesting.Nil(t, err)
-	xtesting.ZeroLen(t, records)
+	xtesting.EmptyCollection(t, records)
 	xtesting.Equal(t, summary.Counters().NodesCreated(), 0)
 
 	// merge
@@ -219,7 +219,7 @@ func TestPool(t *testing.T) {
 		session := check(pool.Dial(neo4j.AccessModeRead))
 		records, _, err := Collect(session.Run(`MATCH (n :XNEO4J_TEST) RETURN n`, nil))
 		xtesting.Nil(t, err)
-		xtesting.ZeroLen(t, records)
+		xtesting.EmptyCollection(t, records)
 	})
 	target := pool.Target()
 	xtesting.Equal(t, target.String(), neo4jTarget)

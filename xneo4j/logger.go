@@ -219,7 +219,7 @@ func extractLoggerParam(result neo4j.Result, err error, source string, options *
 		// ...
 		lines := make([]string, 0, 2)
 		for _, m := range strings.Split(strings.ReplaceAll(err.Error(), "^", ""), "\n") {
-			m = strings.TrimSpace(xstring.RemoveBlanks(m))
+			m = strings.TrimSpace(xstring.RemoveExtraBlanks(m))
 			if len(m) > 0 {
 				lines = append(lines, m)
 			}
