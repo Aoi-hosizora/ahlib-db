@@ -2,7 +2,8 @@ package xgorm
 
 import (
 	"fmt"
-	"github.com/Aoi-hosizora/ahlib-db/xdbutils"
+	"github.com/Aoi-hosizora/ahlib-db/xdbutils/xdbutils_orderby"
+	"github.com/Aoi-hosizora/ahlib-db/xdbutils/xdbutils_sqlite"
 	"github.com/Aoi-hosizora/ahlib/xstatus"
 	"github.com/VividCortex/mysqlerr"
 	"github.com/go-sql-driver/mysql"
@@ -40,7 +41,7 @@ func IsPostgreSQL(db *gorm.DB) bool {
 	return db.Dialect().GetName() == Postgres
 }
 
-// MySQLConfig is an alias type of mysql.Config, can be used to generate dsl by FormatDSN method.
+// MySQLConfig is an alias type of mysql.Config, can be used to generate dsl by its FormatDSN method.
 type MySQLConfig = mysql.Config
 
 // MySQLDefaultCharsetTimeLocParam returns a map as mysql.Config's Param value, it contains the default "utf8mb4" charset, "True" parseTime, and "Local" loc.
@@ -66,17 +67,17 @@ func PostgresDefaultDsn(username, password, host string, port int, database stri
 }
 
 const (
-	// MySQLDuplicateEntryErrno is MySQL's ER_DUP_ENTRY errno, referred from https://github.com/VividCortex/mysqlerr/blob/master/mysqlerr.go and
+	// MySQLDuplicateEntryErrno is MySQL's DUP_ENTRY errno, referred from https://github.com/VividCortex/mysqlerr/blob/master/mysqlerr.go and
 	// https://dev.mysql.com/doc/mysql-errors/8.0/en/server-error-reference.htm.
-	MySQLDuplicateEntryErrno = mysqlerr.ER_DUP_ENTRY // 1062
+	MySQLDuplicateEntryErrno = uint16(mysqlerr.ER_DUP_ENTRY) // 1062, DUP_ENTRY
 
 	// SQLiteUniqueConstraintErrno is SQLite's CONSTRAINT_UNIQUE extended errno, referred from https://github.com/mattn/go-sqlite3/blob/master/error.go
 	// and http://www.sqlite.org/c3ref/c_abort_rollback.html.
-	SQLiteUniqueConstraintErrno = 19 | 8<<8
+	SQLiteUniqueConstraintErrno = int(xdbutils_sqlite.ErrConstraintUnique) // 19 | 8<<8, sqlite3.ErrConstraintUnique
 
 	// PostgreSQLUniqueViolationErrno is PostgreSQL's unique_violation errno, referred from https://github.com/lib/pq/blob/master/error.go and
 	// https://www.postgresql.org/docs/10/errcodes-appendix.html
-	PostgreSQLUniqueViolationErrno = "23505"
+	PostgreSQLUniqueViolationErrno = "23505" // pq.errorCodeNames unique_violation
 )
 
 // IsMySQLDuplicateEntryError checks whether err is MySQL's ER_DUP_ENTRY error, whose error code is MySQLDuplicateEntryErrno.
@@ -95,9 +96,9 @@ func IsPostgreSQLUniqueViolationError(err error) bool {
 	return ok && pe.Code == PostgreSQLUniqueViolationErrno
 }
 
-// ==============
-// CRUD and other
-// ==============
+// ===============
+// CRUD and others
+// ===============
 
 // QueryErr checks gorm.DB after query operated, will only return xstatus.DbSuccess, xstatus.DbNotFound and xstatus.DbFailed.
 func QueryErr(rdb *gorm.DB) (xstatus.DbStatus, error) {
@@ -106,6 +107,34 @@ func QueryErr(rdb *gorm.DB) (xstatus.DbStatus, error) {
 		return xstatus.DbNotFound, nil // not found
 	case rdb.Error != nil:
 		return xstatus.DbFailed, rdb.Error // failed
+	}
+	return xstatus.DbSuccess, nil
+}
+
+// CreateErr checks gorm.DB after create operated, will only return xstatus.DbSuccess, xstatus.DbExisted and xstatus.DbFailed.
+func CreateErr(rdb *gorm.DB) (xstatus.DbStatus, error) {
+	switch {
+	case IsMySQL(rdb) && IsMySQLDuplicateEntryError(rdb.Error),
+		IsSQLite(rdb) && IsSQLiteUniqueConstraintError(rdb.Error),
+		IsPostgreSQL(rdb) && IsPostgreSQLUniqueViolationError(rdb.Error):
+		return xstatus.DbExisted, rdb.Error // duplicate
+	case rdb.Error != nil:
+		return xstatus.DbFailed, rdb.Error // failed
+	}
+	return xstatus.DbSuccess, nil
+}
+
+// UpdateErr checks gorm.DB after update operated, will only return xstatus.DbSuccess, xstatus.DbNotFound, xstatus.DbExisted and xstatus.DbFailed.
+func UpdateErr(rdb *gorm.DB) (xstatus.DbStatus, error) {
+	switch {
+	case IsMySQL(rdb) && IsMySQLDuplicateEntryError(rdb.Error),
+		IsSQLite(rdb) && IsSQLiteUniqueConstraintError(rdb.Error),
+		IsPostgreSQL(rdb) && IsPostgreSQLUniqueViolationError(rdb.Error):
+		return xstatus.DbExisted, rdb.Error // duplicate
+	case rdb.Error != nil:
+		return xstatus.DbFailed, rdb.Error // failed
+	case rdb.RowsAffected == 0:
+		return xstatus.DbNotFound, nil // not found
 	}
 	return xstatus.DbSuccess, nil
 }
@@ -122,10 +151,10 @@ func DeleteErr(rdb *gorm.DB) (xstatus.DbStatus, error) {
 }
 
 // PropertyValue is a struct type of database entity's property mapping rule, used in GenerateOrderByExpr.
-type PropertyValue = xdbutils.PropertyValue
+type PropertyValue = xdbutils_orderby.PropertyValue
 
 // PropertyDict is a dictionary type to store pairs from data transfer object to database entity's PropertyValue, used in GenerateOrderByExpr.
-type PropertyDict = xdbutils.PropertyDict
+type PropertyDict = xdbutils_orderby.PropertyDict
 
 // NewPropertyValue creates a PropertyValue by given reverse and destinations, used to describe database entity's property mapping rule.
 //
@@ -133,7 +162,7 @@ type PropertyDict = xdbutils.PropertyDict
 // 1. `destinations` represents mapping property destination array, use `property_name` directly for sql, use `returned_name.property_name` for cypher.
 // 2. `reverse` represents the flag whether you need to revert the order or not.
 func NewPropertyValue(reverse bool, destinations ...string) *PropertyValue {
-	return xdbutils.NewPropertyValue(reverse, destinations...)
+	return xdbutils_orderby.NewPropertyValue(reverse, destinations...)
 }
 
 // GenerateOrderByExpr returns a generated order-by expression by given source (query string) order string (such as "name desc, age asc") and PropertyDict.
@@ -148,5 +177,5 @@ func NewPropertyValue(reverse bool, destinations ...string) *PropertyValue {
 // 	_ = GenerateOrderByExpr(`uid, age desc`, dict) // => uid ASC, birthday ASC
 // 	_ = GenerateOrderByExpr(`age, username desc`, dict) // => birthday DESC, firstname DESC, lastname DESC
 func GenerateOrderByExpr(source string, dict PropertyDict) string {
-	return xdbutils.GenerateOrderByExpr(source, dict)
+	return xdbutils_orderby.GenerateOrderByExpr(source, dict)
 }

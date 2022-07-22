@@ -12,8 +12,8 @@ import (
 )
 
 func TestMess2(t *testing.T) {
-	xtesting.True(t, IsSQLiteUniqueConstraintError(sqlite3.Error{ExtendedCode: SQLiteUniqueConstraintErrno}))
-	xtesting.True(t, IsSQLiteUniqueConstraintError(&sqlite3.Error{ExtendedCode: SQLiteUniqueConstraintErrno}))
+	xtesting.True(t, IsSQLiteUniqueConstraintError(sqlite3.Error{ExtendedCode: sqlite3.ErrNoExtended(SQLiteUniqueConstraintErrno)}))
+	xtesting.True(t, IsSQLiteUniqueConstraintError(&sqlite3.Error{ExtendedCode: sqlite3.ErrNoExtended(SQLiteUniqueConstraintErrno)}))
 }
 
 func TestHook(t *testing.T) {

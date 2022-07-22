@@ -1,7 +1,7 @@
 package xneo4j
 
 import (
-	"github.com/Aoi-hosizora/ahlib-db/xdbutils"
+	"github.com/Aoi-hosizora/ahlib-db/xdbutils/xdbutils_orderby"
 	"github.com/neo4j/neo4j-go-driver/neo4j"
 	"time"
 )
@@ -11,11 +11,11 @@ import (
 // Neo4j go driver 1.x can refer to https://github.com/neo4j/neo4j-go-driver/tree/1.8.
 // Neo4j go driver 4.x can refer to https://github.com/neo4j/neo4j-go-driver/master.
 
-// P is a cypher parameters type, equals to `map[string]interface{}`.
+// P is a cypher parameters type, is always same as `map[string]interface{}`.
 //
 // Example:
 // 	session.Run(`MATCH (n {id: $id}) RETURN n`, xneo4j.P{"id": 2})
-type P map[string]interface{}
+type P = map[string]interface{}
 
 // =========================
 // collect and get functions
@@ -136,10 +136,10 @@ func GetDuration(data interface{}) neo4j.Duration {
 // ========
 
 // PropertyValue is a struct type of database entity's property mapping rule, used in GenerateOrderByExpr.
-type PropertyValue = xdbutils.PropertyValue
+type PropertyValue = xdbutils_orderby.PropertyValue
 
 // PropertyDict is a dictionary type to store pairs from data transfer object to database entity's PropertyValue, used in GenerateOrderByExpr.
-type PropertyDict = xdbutils.PropertyDict
+type PropertyDict = xdbutils_orderby.PropertyDict
 
 // NewPropertyValue creates a PropertyValue by given reverse and destinations, used to describe database entity's property mapping rule.
 //
@@ -147,7 +147,7 @@ type PropertyDict = xdbutils.PropertyDict
 // 1. `destinations` represents mapping property destination array, use `property_name` directly for sql, use `returned_name.property_name` for cypher.
 // 2. `reverse` represents the flag whether you need to revert the order or not.
 func NewPropertyValue(reverse bool, destinations ...string) *PropertyValue {
-	return xdbutils.NewPropertyValue(reverse, destinations...)
+	return xdbutils_orderby.NewPropertyValue(reverse, destinations...)
 }
 
 // GenerateOrderByExpr returns a generated order-by expression by given source (query string) order string (such as "name desc, age asc") and PropertyDict.
@@ -162,7 +162,7 @@ func NewPropertyValue(reverse bool, destinations ...string) *PropertyValue {
 // 	_ = GenerateOrderByExpr(`uid, age desc`, dict) // => p.uid ASC, u.birthday ASC
 // 	_ = GenerateOrderByExpr(`age, username desc`, dict) // => u.birthday DESC, p.firstname DESC, p.lastname DESC
 func GenerateOrderByExpr(source string, dict PropertyDict) string {
-	return xdbutils.GenerateOrderByExpr(source, dict)
+	return xdbutils_orderby.GenerateOrderByExpr(source, dict)
 }
 
 // ====================
