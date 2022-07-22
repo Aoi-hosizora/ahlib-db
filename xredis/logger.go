@@ -39,14 +39,14 @@ func WithLogCmd(log bool) LoggerOption {
 	}
 }
 
-// WithSkip creates a LoggerOption to specific runtime skip for getting runtime information, defaults to 4.
+// WithSkip creates a LoggerOption to specify runtime skip for getting runtime information, defaults to 4.
 func WithSkip(skip int) LoggerOption {
 	return func(o *loggerOptions) {
 		o.skip = skip
 	}
 }
 
-// WithSlowThreshold creates a LoggerOption to specific a slow operation's duration used to highlight loggers, defaults to 0ms, means no highlight.
+// WithSlowThreshold creates a LoggerOption to specify a slow operation's duration used to highlight loggers, defaults to 0ms, means no highlight.
 func WithSlowThreshold(threshold time.Duration) LoggerOption {
 	return func(o *loggerOptions) {
 		o.slowThreshold = threshold

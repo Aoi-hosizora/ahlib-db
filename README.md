@@ -7,8 +7,7 @@
 [![Release](https://img.shields.io/github/v/release/Aoi-hosizora/ahlib-db)](https://github.com/Aoi-hosizora/ahlib-db/releases)
 [![Go Reference](https://pkg.go.dev/badge/github.com/Aoi-hosizora/ahlib-db.svg)](https://pkg.go.dev/github.com/Aoi-hosizora/ahlib-db)
 
-+ A personal golang library for db development, including: mysql+sqlite+postgres ([gorm (v1)](https://github.com/jinzhu/gorm) / [gorm (v2)](https://github.com/go-gorm/gorm)),
-  redis ([go-redis](https://github.com/go-redis/redis)), neo4j ([neo4j-go-driver (v1)](https://github.com/neo4j/neo4j-go-driver)), requires `Go >= 1.15`.
++ A personal golang library for db development, including: mysql+sqlite+postgres ([gorm (v1)](https://github.com/jinzhu/gorm) / [gorm (v2)](https://github.com/go-gorm/gorm)), redis ([go-redis](https://github.com/go-redis/redis)), neo4j ([neo4j-go-driver (v1)](https://github.com/neo4j/neo4j-go-driver)), requires `Go >= 1.15`.
 
 ### Related libraries
 
@@ -19,6 +18,7 @@
 
 ### Packages
 
++ xdbutils/*
 + xgorm
 + xgormv2
 + xneo4j
@@ -30,6 +30,7 @@
 
 + See [go.mod](./xgorm/go.mod) and [go.sum](./xgorm/go.sum)
 + `github.com/Aoi-hosizora/ahlib v1.6.0`
++ `github.com/Aoi-hosizora/ahlib-db/xdbutils v1.6.0`
 + `github.com/jinzhu/gorm v1.9.16`
 + `github.com/go-sql-driver/mysql v1.5.0`
 + `github.com/VividCortex/mysqlerr v1.0.0`
@@ -41,6 +42,7 @@
 
 + See [go.mod](./xgormv2/go.mod) and [go.sum](./xgormv2/go.sum)
 + `github.com/Aoi-hosizora/ahlib v1.6.0`
++ `github.com/Aoi-hosizora/ahlib-db/xdbutils v1.6.0`
 + `gorm.io/gorm v1.22.4`
 + `gorm.io/driver/mysql v1.2.3`
 + `gorm.io/driver/sqlite v1.2.6`
@@ -53,6 +55,7 @@
 
 + See [go.mod](./xneo4j/go.mod) and [go.sum](./xneo4j/go.sum)
 + `github.com/Aoi-hosizora/ahlib v1.6.0`
++ `github.com/Aoi-hosizora/ahlib-db/xdbutils v1.6.0`
 + `github.com/neo4j/neo4j-go-driver v1.8.3`
 + `github.com/sirupsen/logrus v1.8.1`
 

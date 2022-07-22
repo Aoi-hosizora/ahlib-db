@@ -172,70 +172,70 @@ func GenerateOrderByExpr(source string, dict PropertyDict) string {
 // DriverOption represents an option type for neo4j.NewDriver's option, can be created by WithXXX functions.
 type DriverOption func(*neo4j.Config)
 
-// WithEncrypted returns a neo4j.Config option function to specific encrypted flag for neo4j.Driver, defaults to true.
+// WithEncrypted returns a neo4j.Config option function to specify encrypted flag for neo4j.Driver, defaults to true.
 func WithEncrypted(encrypted bool) DriverOption {
 	return func(config *neo4j.Config) {
 		config.Encrypted = encrypted
 	}
 }
 
-// WithTrustStrategy returns a neo4j.Config option function to specific trust strategy for neo4j.Driver, defaults to neo4j.TrustAny(false).
+// WithTrustStrategy returns a neo4j.Config option function to specify trust strategy for neo4j.Driver, defaults to neo4j.TrustAny(false).
 func WithTrustStrategy(e neo4j.TrustStrategy) DriverOption {
 	return func(config *neo4j.Config) {
 		config.TrustStrategy = e
 	}
 }
 
-// WithLog returns a neo4j.Config option function to specific log function for neo4j.Driver, defaults to neo4j.NoOpLogger.
+// WithLog returns a neo4j.Config option function to specify log function for neo4j.Driver, defaults to neo4j.NoOpLogger.
 func WithLog(l neo4j.Logging) DriverOption {
 	return func(config *neo4j.Config) {
 		config.Log = l
 	}
 }
 
-// WithAddressResolver returns a neo4j.Config option function to specific address resolver for neo4j.Driver, defaults to nil.
+// WithAddressResolver returns a neo4j.Config option function to specify address resolver for neo4j.Driver, defaults to nil.
 func WithAddressResolver(resolver neo4j.ServerAddressResolver) DriverOption {
 	return func(config *neo4j.Config) {
 		config.AddressResolver = resolver
 	}
 }
 
-// WithMaxTransactionRetryTime returns a neo4j.Config option function to specific max transaction retry time for neo4j.Driver, defaults to 30s.
+// WithMaxTransactionRetryTime returns a neo4j.Config option function to specify max transaction retry time for neo4j.Driver, defaults to 30s.
 func WithMaxTransactionRetryTime(t time.Duration) DriverOption {
 	return func(config *neo4j.Config) {
 		config.MaxTransactionRetryTime = t
 	}
 }
 
-// WithMaxConnectionPoolSize returns a neo4j.Config option function to specific max connection pool size for neo4j.Driver, defaults to 100.
+// WithMaxConnectionPoolSize returns a neo4j.Config option function to specify max connection pool size for neo4j.Driver, defaults to 100.
 func WithMaxConnectionPoolSize(size int) DriverOption {
 	return func(config *neo4j.Config) {
 		config.MaxConnectionPoolSize = size
 	}
 }
 
-// WithMaxConnectionLifetime returns a neo4j.Config option function to specific max connection lifetime for neo4j.Driver, defaults to 1h.
+// WithMaxConnectionLifetime returns a neo4j.Config option function to specify max connection lifetime for neo4j.Driver, defaults to 1h.
 func WithMaxConnectionLifetime(t time.Duration) DriverOption {
 	return func(config *neo4j.Config) {
 		config.MaxConnectionLifetime = t
 	}
 }
 
-// WithConnectionAcquisitionTimeout returns a neo4j.Config option function to specific connection acquisition timeout for neo4j.Driver, defaults to 1min.
+// WithConnectionAcquisitionTimeout returns a neo4j.Config option function to specify connection acquisition timeout for neo4j.Driver, defaults to 1min.
 func WithConnectionAcquisitionTimeout(t time.Duration) DriverOption {
 	return func(config *neo4j.Config) {
 		config.ConnectionAcquisitionTimeout = t
 	}
 }
 
-// WithSocketConnectTimeout returns a neo4j.Config option function to specific socket connect timeout for neo4j.Driver, defaults to 5s.
+// WithSocketConnectTimeout returns a neo4j.Config option function to specify socket connect timeout for neo4j.Driver, defaults to 5s.
 func WithSocketConnectTimeout(t time.Duration) DriverOption {
 	return func(config *neo4j.Config) {
 		config.SocketConnectTimeout = t
 	}
 }
 
-// WithSocketKeepalive returns a neo4j.Config option function to specific socket keepalive flag for neo4j.Driver, defaults to true.
+// WithSocketKeepalive returns a neo4j.Config option function to specify socket keepalive flag for neo4j.Driver, defaults to true.
 func WithSocketKeepalive(keepalive bool) DriverOption {
 	return func(config *neo4j.Config) {
 		config.SocketKeepalive = keepalive

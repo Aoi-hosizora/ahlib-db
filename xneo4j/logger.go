@@ -19,7 +19,7 @@ import (
 type loggerOptions struct {
 	logErr        bool
 	logCypher     bool
-	counterField  bool
+	counterFields bool
 	skip          int
 	slowThreshold time.Duration
 }
@@ -41,21 +41,21 @@ func WithLogCypher(log bool) LoggerOption {
 	}
 }
 
-// WithCounterField creates a LoggerOption to decide whether to do store counter fields to logrus.Fields or not, defaults to false.
-func WithCounterField(flag bool) LoggerOption {
+// WithCounterFields creates a LoggerOption to decide whether to do store counter fields to logrus.Fields or not, defaults to false.
+func WithCounterFields(flag bool) LoggerOption {
 	return func(o *loggerOptions) {
-		o.counterField = flag
+		o.counterFields = flag
 	}
 }
 
-// WithSkip creates a LoggerOption to specific runtime skip for getting runtime information, defaults to 1.
+// WithSkip creates a LoggerOption to specify runtime skip for getting runtime information, defaults to 1.
 func WithSkip(skip int) LoggerOption {
 	return func(o *loggerOptions) {
 		o.skip = skip
 	}
 }
 
-// WithSlowThreshold creates a LoggerOption to specific a slow operation's duration used to highlight loggers, defaults to 0ms, means no highlight.
+// WithSlowThreshold creates a LoggerOption to specify a slow operation's duration used to highlight loggers, defaults to 0ms, means no highlight.
 func WithSlowThreshold(threshold time.Duration) LoggerOption {
 	return func(o *loggerOptions) {
 		o.slowThreshold = threshold
@@ -99,7 +99,7 @@ type LogrusLogger struct {
 // 	l.SetFormatter(&logrus.TextFormatter{})
 // 	sess = NewLogrusLogger(sess, l)
 func NewLogrusLogger(session neo4j.Session, logger *logrus.Logger, options ...LoggerOption) *LogrusLogger {
-	opt := &loggerOptions{logErr: true, logCypher: true, counterField: false, skip: 1}
+	opt := &loggerOptions{logErr: true, logCypher: true, counterFields: false, skip: 1}
 	for _, op := range options {
 		if op != nil {
 			op(opt)
@@ -123,7 +123,7 @@ type StdLogger struct {
 // 	l := log.Default()
 // 	sess = NewStdLogger(sess, l)
 func NewStdLogger(session neo4j.Session, logger logrus.StdLogger, options ...LoggerOption) *StdLogger {
-	opt := &loggerOptions{logErr: true, logCypher: true, counterField: false, skip: 1}
+	opt := &loggerOptions{logErr: true, logCypher: true, counterFields: false, skip: 1}
 	for _, op := range options {
 		if op != nil {
 			op(opt)
@@ -203,7 +203,7 @@ var (
 // extractLoggerParam extracts and returns LoggerParam using given parameters.
 func extractLoggerParam(result neo4j.Result, err error, source string, options *loggerOptions) *LoggerParam {
 	if err != nil {
-		// failed to connect (Connection error)
+		// 1. failed to connect (Connection error)
 		// the target machine actively refused it
 		// ...
 		return &LoggerParam{Type: "connection", ErrorMsg: err.Error(), Source: source}
@@ -211,7 +211,7 @@ func extractLoggerParam(result neo4j.Result, err error, source string, options *
 
 	summary, err := result.Summary()
 	if err != nil {
-		// failed to execute (Server error)
+		// 2. failed to execute (Server error)
 		// Neo.ClientError.Security.Unauthorized
 		// Neo.ClientError.Statement.SyntaxError
 		// Neo.ClientError.Statement.TypeError
@@ -239,7 +239,7 @@ func extractLoggerParam(result neo4j.Result, err error, source string, options *
 		Slow:     slow,
 		Source:   source,
 	}
-	if options.counterField {
+	if options.counterFields {
 		p.Counter = summary.Counters()
 	}
 	return p
@@ -365,7 +365,7 @@ func render(cypher string, params map[string]interface{}) string {
 
 	result := cypher
 	for k, v := range values {
-		placeholder := fmt.Sprintf(`\$%s([^\w]|$)`, k) // `\$s([^\w]|$)` || `\$s(\W)`
+		placeholder := fmt.Sprintf(`\$%s([^\w]|$)`, k) // `\$...([^\w]|$)` or `\$...(\W)`
 		result = regexp.MustCompile(placeholder).ReplaceAllString(result, v+"$1")
 	}
 	return strings.TrimSpace(result)

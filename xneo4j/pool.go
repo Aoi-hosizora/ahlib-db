@@ -19,7 +19,6 @@ type DialHandler func(driver neo4j.Driver, config *neo4j.SessionConfig) (neo4j.S
 // as long as there are free connections available in the connection pool.
 //
 // 3. The neo4j.Driver is thread-safe, while the neo4j.Session or the neo4j.Transaction is not thread-safe.
-//
 type Pool struct {
 	driver neo4j.Driver
 	dial   DialHandler

@@ -16,13 +16,13 @@ import (
 // ========
 
 const (
-	// MySQL is MySQL dialect for gorm, remember to use https://github.com/go-gorm/mysql to open a mysql gorm.DB.
+	// MySQL is "mysql" dialect for gorm. Remember to use github.com/go-gorm/mysql to open a mysql gorm.DB.
 	MySQL = "mysql"
 
-	// SQLite is SQLite dialect for gorm, remember to use https://github.com/go-gorm/sqlite to open a sqlite gorm.DB.
+	// SQLite is "sqlite" dialect for gorm. Remember to use github.com/go-gorm/sqlite to open a sqlite gorm.DB.
 	SQLite = "sqlite"
 
-	// Postgres is PostgreSQL dialect for gorm, remember to use https://github.com/go-gorm/postgres to open a postgres gorm.DB.
+	// Postgres is "postgres" dialect for gorm. Remember to use github.com/go-gorm/postgres to open a postgres gorm.DB.
 	Postgres = "postgres"
 )
 

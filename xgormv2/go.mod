@@ -16,5 +16,5 @@ require (
 
 replace (
 	github.com/Aoi-hosizora/ahlib => ../../ahlib
-	github.com/Aoi-hosizora/ahlib-db/xdbutils => ./../xdbutils
+	github.com/Aoi-hosizora/ahlib-db/xdbutils => ../xdbutils
 )

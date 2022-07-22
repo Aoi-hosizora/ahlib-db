@@ -65,7 +65,7 @@
 + `func NewPool(driver neo4j.Driver, dial DialHandler) *Pool`
 + `func WithLogErr(log bool) LoggerOption`
 + `func WithLogCypher(log bool) LoggerOption`
-+ `func WithCounterField(flag bool) LoggerOption`
++ `func WithCounterFields(flag bool) LoggerOption`
 + `func WithSkip(skip int) LoggerOption`
 + `func WithSlowThreshold(threshold time.Duration) LoggerOption`
 + `func EnableLogger()`

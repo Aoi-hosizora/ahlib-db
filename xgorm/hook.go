@@ -12,6 +12,7 @@ const (
 	// DefaultDeletedAtTimestamp represents the default value in `gorm` tag of GormTime.DeletedAt.
 	DefaultDeletedAtTimestamp = "1970-01-01 00:00:01"
 
+	// deletedAtFieldName is the "DeletedAt" field name constant.
 	deletedAtFieldName = "DeletedAt"
 )
 
@@ -28,7 +29,7 @@ type GormTime2 struct {
 	UpdatedAt time.Time
 }
 
-// Gorm's callback names, please see gorm.Callback or visit https://github.com/jinzhu/gorm/blob/master/callback.go for more details.
+// Gorm's callback names. See gorm.Callback or visit https://github.com/jinzhu/gorm/blob/master/callback.go for more details.
 const (
 	CreateCallbackName   = "gorm:create"
 	UpdateCallbackName   = "gorm:update"
