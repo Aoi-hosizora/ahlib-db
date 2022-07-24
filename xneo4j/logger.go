@@ -100,9 +100,9 @@ type LogrusLogger struct {
 // 	sess = NewLogrusLogger(sess, l)
 func NewLogrusLogger(session neo4j.Session, logger *logrus.Logger, options ...LoggerOption) *LogrusLogger {
 	opt := &loggerOptions{logErr: true, logCypher: true, counterFields: false, skip: 1}
-	for _, op := range options {
-		if op != nil {
-			op(opt)
+	for _, o := range options {
+		if o != nil {
+			o(opt)
 		}
 	}
 	return &LogrusLogger{Session: session, logger: logger, option: opt}
@@ -124,9 +124,9 @@ type StdLogger struct {
 // 	sess = NewStdLogger(sess, l)
 func NewStdLogger(session neo4j.Session, logger logrus.StdLogger, options ...LoggerOption) *StdLogger {
 	opt := &loggerOptions{logErr: true, logCypher: true, counterFields: false, skip: 1}
-	for _, op := range options {
-		if op != nil {
-			op(opt)
+	for _, o := range options {
+		if o != nil {
+			o(opt)
 		}
 	}
 	return &StdLogger{Session: session, logger: logger, option: opt}

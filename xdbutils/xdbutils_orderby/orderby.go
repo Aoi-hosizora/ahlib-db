@@ -97,33 +97,26 @@ func defaultTargetProcessor(destination string, asc bool) (target string) {
 
 // buildOrderByOptions creates a orderByOptions with given OrderByOption-s.
 func buildOrderByOptions(options []OrderByOption) *orderByOptions {
-	out := &orderByOptions{
-		sourceSeparator: ",",
-		targetSeparator: ", ",
-		sourceProcessor: defaultSourceProcessor,
-		targetProcessor: defaultTargetProcessor,
-	}
-	for _, op := range options {
-		if op != nil {
-			op(out)
+	opt := &orderByOptions{}
+	for _, o := range options {
+		if o != nil {
+			o(opt)
 		}
 	}
-	if out.sourceSeparator == "" {
-		out.sourceSeparator = ","
+	if opt.sourceSeparator == "" {
+		opt.sourceSeparator = ","
 	}
-	if out.targetSeparator == "" {
-		out.targetSeparator = ", "
+	if opt.targetSeparator == "" {
+		opt.targetSeparator = ", "
 	}
-	if out.sourceProcessor == nil {
-		out.sourceProcessor = defaultSourceProcessor
+	if opt.sourceProcessor == nil {
+		opt.sourceProcessor = defaultSourceProcessor
 	}
-	if out.targetProcessor == nil {
-		out.targetProcessor = defaultTargetProcessor
+	if opt.targetProcessor == nil {
+		opt.targetProcessor = defaultTargetProcessor
 	}
-	return out
+	return opt
 }
-
-// TODO search for "options ..."
 
 // GenerateOrderByExpr returns a generated order-by expression by given order-by query source string (such as "name desc, age asc") and PropertyDict,
 // with some OrderByOption-s. The generated expression will be in mysql-sql (such as "xxx ASC") or neo4j-cypher style (such as "xxx.yyy DESC").
