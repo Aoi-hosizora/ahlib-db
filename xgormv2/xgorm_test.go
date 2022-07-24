@@ -186,6 +186,7 @@ func testHelper(t *testing.T, giveDialector gorm.Dialector) {
 		"username": NewPropertyValue(false, "firstname", "lastname"),
 		"age":      NewPropertyValue(true, "birthday"),
 	}
+	nilOptions := []OrderByOption{WithSourceSeparator(""), WithTargetSeparator(""), WithSourceProcessor(nil), WithTargetProcessor(nil)}
 	for _, tc := range []struct {
 		giveSource string
 		giveDict   PropertyDict
@@ -196,7 +197,7 @@ func testHelper(t *testing.T, giveDialector gorm.Dialector) {
 		{"uid, username", dict, "uid ASC, firstname ASC, lastname ASC"},
 		{"username desc, age desc", dict, "firstname DESC, lastname DESC, birthday ASC"},
 	} {
-		xtesting.Equal(t, GenerateOrderByExpr(tc.giveSource, tc.giveDict), tc.want)
+		xtesting.Equal(t, GenerateOrderByExpr(tc.giveSource, tc.giveDict, nilOptions...), tc.want)
 	}
 }
 

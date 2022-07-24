@@ -18,6 +18,7 @@
 + `type MySQLConfig struct`
 + `type PropertyValue struct`
 + `type PropertyDict map`
++ `type OrderByOption func`
 + `type GormTime struct`
 + `type GormTime2 struct`
 + `type LoggerOption func`
@@ -65,7 +66,11 @@
 + `func UpdateErr(rdb *gorm.DB) (xstatus.DbStatus, error)`
 + `func DeleteErr(rdb *gorm.DB) (xstatus.DbStatus, error)`
 + `func NewPropertyValue(reverse bool, destinations ...string) *PropertyValue`
-+ `func GenerateOrderByExp(source string, dict PropertyDict) string`
++ `func WithSourceSeparator(separator string) OrderByOption`
++ `func WithTargetSeparator(separator string) OrderByOption`
++ `func WithSourceProcessor(processor func(source string) (field string, asc bool)) OrderByOption`
++ `func WithTargetProcessor(processor func(destination string, asc bool) (target string)) OrderByOption`
++ `func GenerateOrderByExpr(querySource string, dict PropertyDict, options ...OrderByOption) string`
 + `func HookDeletedAt(db *gorm.DB, defaultTimestamp string)`
 + `func WithLogInfo(log bool) LoggerOption`
 + `func WithLogSQL(log bool) LoggerOption`

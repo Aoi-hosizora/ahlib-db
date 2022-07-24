@@ -113,6 +113,7 @@ func TestHelper(t *testing.T) {
 			"username": NewPropertyValue(false, "n.firstname", "n.lastname"),
 			"age":      NewPropertyValue(true, "r.birthday"),
 		}
+		nilOptions := []OrderByOption{WithSourceSeparator(""), WithTargetSeparator(""), WithSourceProcessor(nil), WithTargetProcessor(nil)}
 		for _, tc := range []struct {
 			giveSource string
 			giveDict   PropertyDict
@@ -123,7 +124,7 @@ func TestHelper(t *testing.T) {
 			{"uid, username", dict, "n.uid ASC, n.firstname ASC, n.lastname ASC"},
 			{"username desc, age desc", dict, "n.firstname DESC, n.lastname DESC, r.birthday ASC"},
 		} {
-			xtesting.Equal(t, GenerateOrderByExpr(tc.giveSource, tc.giveDict), tc.want)
+			xtesting.Equal(t, GenerateOrderByExpr(tc.giveSource, tc.giveDict, nilOptions...), tc.want)
 		}
 	})
 

@@ -150,23 +150,48 @@ func DeleteErr(rdb *gorm.DB) (xstatus.DbStatus, error) {
 	return xstatus.DbSuccess, nil
 }
 
-// PropertyValue is a struct type of database entity's property mapping rule, used in GenerateOrderByExpr.
+// PropertyValue represents database single entity's property mapping rule, is used in GenerateOrderByExpr.
 type PropertyValue = xdbutils_orderby.PropertyValue
 
-// PropertyDict is a dictionary type to store pairs from data transfer object to database entity's PropertyValue, used in GenerateOrderByExpr.
+// PropertyDict is used to store PropertyValue-s for data transfer object (dto) to entity's property mapping rule, is used in GenerateOrderByExpr.
 type PropertyDict = xdbutils_orderby.PropertyDict
 
-// NewPropertyValue creates a PropertyValue by given reverse and destinations, used to describe database entity's property mapping rule.
+// OrderByOption represents an option type for GenerateOrderByExpr's option, can be created by WithXXX functions.
+type OrderByOption = xdbutils_orderby.OrderByOption
+
+// WithSourceSeparator creates an OrderByOption to specify the source order-by expression fields separator, defaults to ",".
+func WithSourceSeparator(separator string) OrderByOption {
+	return xdbutils_orderby.WithSourceSeparator(separator)
+}
+
+// WithTargetSeparator creates an OrderByOption to specify the target order-by expression fields separator, defaults to ", ".
+func WithTargetSeparator(separator string) OrderByOption {
+	return xdbutils_orderby.WithTargetSeparator(separator)
+}
+
+// WithSourceProcessor creates an OrderByOption to specify the source processor for extracting field name and ascending flag from given source,
+// defaults to use the "field asc" or "field desc" format (case-insensitive) to extract information.
+func WithSourceProcessor(processor func(source string) (field string, asc bool)) OrderByOption {
+	return xdbutils_orderby.WithSourceProcessor(processor)
+}
+
+// WithTargetProcessor creates an OrderByOption to specify the target processor for combining field name and ascending flag to target expression,
+// defaults to generate the target with "destination ASC" or "destination DESC" format.
+func WithTargetProcessor(processor func(destination string, asc bool) (target string)) OrderByOption {
+	return xdbutils_orderby.WithTargetProcessor(processor)
+}
+
+// NewPropertyValue creates a PropertyValue by given reverse and destinations, is used to describe database single entity's property mapping rule.
 //
 // Here:
-// 1. `destinations` represents mapping property destination array, use `property_name` directly for sql, use `returned_name.property_name` for cypher.
+// 1. `destinations` represents mapping property destination list, use `property_name` directly for sql, use `returned_name.property_name` for cypher.
 // 2. `reverse` represents the flag whether you need to revert the order or not.
 func NewPropertyValue(reverse bool, destinations ...string) *PropertyValue {
 	return xdbutils_orderby.NewPropertyValue(reverse, destinations...)
 }
 
-// GenerateOrderByExpr returns a generated order-by expression by given source (query string) order string (such as "name desc, age asc") and PropertyDict.
-// The generated expression is in mysql-sql or neo4j-cypher style (such as "xxx ASC" or "xxx.yyy DESC").
+// GenerateOrderByExpr returns a generated order-by expression by given order-by query source string (such as "name desc, age asc") and PropertyDict,
+// with some OrderByOption-s. The generated expression will be in mysql-sql (such as "xxx ASC") or neo4j-cypher style (such as "xxx.yyy DESC").
 //
 // Example:
 // 	dict := PropertyDict{
@@ -176,6 +201,6 @@ func NewPropertyValue(reverse bool, destinations ...string) *PropertyValue {
 // 	}
 // 	_ = GenerateOrderByExpr(`uid, age desc`, dict) // => uid ASC, birthday ASC
 // 	_ = GenerateOrderByExpr(`age, username desc`, dict) // => birthday DESC, firstname DESC, lastname DESC
-func GenerateOrderByExpr(source string, dict PropertyDict) string {
-	return xdbutils_orderby.GenerateOrderByExpr(source, dict)
+func GenerateOrderByExpr(querySource string, dict PropertyDict, options ...OrderByOption) string {
+	return xdbutils_orderby.GenerateOrderByExpr(querySource, dict, options...)
 }

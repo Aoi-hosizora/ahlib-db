@@ -4,7 +4,7 @@ import (
 	"strings"
 )
 
-// PropertyValue is a struct type of database entity's property mapping rule, used in GenerateOrderByExpr.
+// PropertyValue represents database single entity's property mapping rule, is used in GenerateOrderByExpr.
 type PropertyValue struct {
 	destinations []string
 	reverse      bool
@@ -15,32 +15,118 @@ func (p *PropertyValue) Destinations() []string {
 	return p.destinations
 }
 
-// Reverse returns the reverse of PropertyValue.
+// Reverse returns the reverse flag of PropertyValue.
 func (p *PropertyValue) Reverse() bool {
 	return p.reverse
 }
 
-// PropertyDict is a dictionary type to store pairs from data transfer object to database entity's PropertyValue, used in GenerateOrderByExpr.
+// PropertyDict is used to store PropertyValue-s for data transfer object (dto) to entity's property mapping rule, is used in GenerateOrderByExpr.
 type PropertyDict map[string]*PropertyValue
 
-// NewPropertyValue creates a PropertyValue by given reverse and destinations, used to describe database entity's property mapping rule.
+// NewPropertyValue creates a PropertyValue by given reverse and destinations, is used to describe database single entity's property mapping rule.
 //
 // Here:
-// 1. `destinations` represents mapping property destination array, use `property_name` directly for sql, use `returned_name.property_name` for cypher.
+// 1. `destinations` represents mapping property destination list, use `property_name` directly for sql, use `returned_name.property_name` for cypher.
 // 2. `reverse` represents the flag whether you need to revert the order or not.
 func NewPropertyValue(reverse bool, destinations ...string) *PropertyValue {
-	target := make([]string, 0, len(destinations))
+	final := make([]string, 0, len(destinations))
 	for _, d := range destinations {
 		d = strings.TrimSpace(d)
 		if len(d) > 0 {
-			target = append(target, d)
+			final = append(final, d)
 		}
 	}
-	return &PropertyValue{reverse: reverse, destinations: target}
+	return &PropertyValue{reverse: reverse, destinations: final}
 }
 
-// GenerateOrderByExpr returns a generated order-by expression by given source (query string) order string (such as "name desc, age asc") and PropertyDict.
-// The generated expression is in mysql-sql or neo4j-cypher style (such as "xxx ASC" or "xxx.yyy DESC").
+// orderByOptions is a type of GenerateOrderByExpr's option, each field can be set by OrderByOption function type.
+type orderByOptions struct {
+	sourceSeparator string
+	targetSeparator string
+	sourceProcessor func(source string) (field string, asc bool)
+	targetProcessor func(destination string, asc bool) (target string)
+}
+
+// OrderByOption represents an option type for GenerateOrderByExpr's option, can be created by WithXXX functions.
+type OrderByOption func(*orderByOptions)
+
+// WithSourceSeparator creates an OrderByOption to specify the source order-by expression fields separator, defaults to ",".
+func WithSourceSeparator(separator string) OrderByOption {
+	return func(o *orderByOptions) {
+		o.sourceSeparator = separator // no trim
+	}
+}
+
+// WithTargetSeparator creates an OrderByOption to specify the target order-by expression fields separator, defaults to ", ".
+func WithTargetSeparator(separator string) OrderByOption {
+	return func(o *orderByOptions) {
+		o.targetSeparator = separator // no trim
+	}
+}
+
+// WithSourceProcessor creates an OrderByOption to specify the source processor for extracting field name and ascending flag from given source,
+// defaults to use the "field asc" or "field desc" format (case-insensitive) to extract information.
+func WithSourceProcessor(processor func(source string) (field string, asc bool)) OrderByOption {
+	return func(o *orderByOptions) {
+		o.sourceProcessor = processor
+	}
+}
+
+// WithTargetProcessor creates an OrderByOption to specify the target processor for combining field name and ascending flag to target expression,
+// defaults to generate the target with "destination ASC" or "destination DESC" format.
+func WithTargetProcessor(processor func(destination string, asc bool) (target string)) OrderByOption {
+	return func(o *orderByOptions) {
+		o.targetProcessor = processor
+	}
+}
+
+// defaultSourceProcessor is the default source processor, for extracting field name and ascending flag from given source.
+func defaultSourceProcessor(source string) (field string, asc bool) {
+	sp := strings.Split(source, " ") // xxx / yyy asc / zzz desc
+	desc := len(sp) >= 2 && strings.ToLower(strings.TrimSpace(sp[1])) == "desc"
+	return sp[0], !desc
+}
+
+// defaultTargetProcessor is the default target processor, for combining field name and ascending flag to target expression.
+func defaultTargetProcessor(destination string, asc bool) (target string) {
+	if asc {
+		return destination + " ASC" // xxx ASC / yyy.zzz ASC
+	}
+	return destination + " DESC"
+}
+
+// buildOrderByOptions creates a orderByOptions with given OrderByOption-s.
+func buildOrderByOptions(options []OrderByOption) *orderByOptions {
+	out := &orderByOptions{
+		sourceSeparator: ",",
+		targetSeparator: ", ",
+		sourceProcessor: defaultSourceProcessor,
+		targetProcessor: defaultTargetProcessor,
+	}
+	for _, op := range options {
+		if op != nil {
+			op(out)
+		}
+	}
+	if out.sourceSeparator == "" {
+		out.sourceSeparator = ","
+	}
+	if out.targetSeparator == "" {
+		out.targetSeparator = ", "
+	}
+	if out.sourceProcessor == nil {
+		out.sourceProcessor = defaultSourceProcessor
+	}
+	if out.targetProcessor == nil {
+		out.targetProcessor = defaultTargetProcessor
+	}
+	return out
+}
+
+// TODO search for "options ..."
+
+// GenerateOrderByExpr returns a generated order-by expression by given order-by query source string (such as "name desc, age asc") and PropertyDict,
+// with some OrderByOption-s. The generated expression will be in mysql-sql (such as "xxx ASC") or neo4j-cypher style (such as "xxx.yyy DESC").
 //
 // SQL Example:
 // 	dict := PropertyDict{
@@ -59,40 +145,37 @@ func NewPropertyValue(reverse bool, destinations ...string) *PropertyValue {
 // 	}
 // 	_ = GenerateOrderByExpr(`uid, age desc`, dict) // => p.uid ASC, u.birthday ASC
 // 	_ = GenerateOrderByExpr(`age, username desc`, dict) // => u.birthday DESC, p.firstname DESC, p.lastname DESC
-func GenerateOrderByExpr(source string, dict PropertyDict) string {
-	source = strings.TrimSpace(source)
-	if len(source) == 0 || len(dict) == 0 {
+func GenerateOrderByExpr(querySource string, dict PropertyDict, options ...OrderByOption) string {
+	opt := buildOrderByOptions(options)
+	querySource = strings.TrimSpace(querySource)
+	if len(querySource) == 0 || len(dict) == 0 {
 		return ""
 	}
 
-	sources := strings.Split(source, ",")
-	result := make([]string, 0, len(sources))
-	for _, src := range sources {
-		src = strings.TrimSpace(src)
-		if src == "" {
+	sources := strings.Split(querySource, opt.sourceSeparator)
+	targets := make([]string, 0, len(sources))
+	for _, source := range sources {
+		source = strings.TrimSpace(source)
+		if source == "" {
 			continue
 		}
 
-		srcSp := strings.Split(src, " ") // xxx / yyy asc / zzz desc
-		src = srcSp[0]
-		desc := len(srcSp) >= 2 && strings.ToLower(srcSp[1]) == "desc"
-		value, ok := dict[src] // property mapping rule
-		if !ok || value == nil || len(value.destinations) == 0 {
+		field, asc := opt.sourceProcessor(source)
+		rule, ok := dict[field]
+		if !ok || rule == nil || len(rule.destinations) == 0 {
 			continue
 		}
 
-		if value.reverse {
-			desc = !desc
+		if rule.reverse {
+			asc = !asc
 		}
-		for _, prop := range value.destinations {
-			if !desc {
-				prop += " ASC"
-			} else {
-				prop += " DESC"
+		for _, destination := range rule.destinations {
+			target := opt.targetProcessor(destination, asc)
+			if target = strings.TrimSpace(target); target != "" {
+				targets = append(targets, target)
 			}
-			result = append(result, prop)
 		}
 	}
 
-	return strings.Join(result, ", ")
+	return strings.Join(targets, opt.targetSeparator)
 }
