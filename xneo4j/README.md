@@ -12,10 +12,10 @@
 ### Types
 
 + `type P map`
++ `type DriverOption func`
 + `type PropertyValue struct`
 + `type PropertyDict map`
 + `type OrderByOption func`
-+ `type DriverOption func`
 + `type DialHandler func`
 + `type Pool struct`
 + `type LoggerOption func`
@@ -52,12 +52,6 @@
 + `func GetLocalTime(data interface{}) neo4j.LocalTime`
 + `func GetLocalDateTime(data interface{}) neo4j.LocalDateTime`
 + `func GetDuration(data interface{}) neo4j.Duration`
-+ `func NewPropertyValue(reverse bool, destinations ...string) *PropertyValue`
-+ `func WithSourceSeparator(separator string) OrderByOption`
-+ `func WithTargetSeparator(separator string) OrderByOption`
-+ `func WithSourceProcessor(processor func(source string) (field string, asc bool)) OrderByOption`
-+ `func WithTargetProcessor(processor func(destination string, asc bool) (target string)) OrderByOption`
-+ `func GenerateOrderByExpr(querySource string, dict PropertyDict, options ...OrderByOption) string`
 + `func WithEncrypted(encrypted bool) DriverOption`
 + `func WithTrustStrategy(e neo4j.TrustStrategy) DriverOption`
 + `func WithLog(l neo4j.Logging) DriverOption`
@@ -68,6 +62,12 @@
 + `func WithConnectionAcquisitionTimeout(t time.Duration) DriverOption`
 + `func WithSocketConnectTimeout(t time.Duration) DriverOption`
 + `func WithSocketKeepalive(keepalive bool) DriverOption`
++ `func NewPropertyValue(reverse bool, destinations ...string) *PropertyValue`
++ `func WithOrderBySourceSeparator(separator string) OrderByOption`
++ `func WithOrderByTargetSeparator(separator string) OrderByOption`
++ `func WithOrderBySourceProcessor(processor func(source string) (field string, asc bool)) OrderByOption`
++ `func WithOrderByTargetProcessor(processor func(destination string, asc bool) (target string)) OrderByOption`
++ `func GenerateOrderByExpr(querySource string, dict PropertyDict, options ...OrderByOption) string`
 + `func NewPool(driver neo4j.Driver, dial DialHandler) *Pool`
 + `func WithLogErr(log bool) LoggerOption`
 + `func WithLogCypher(log bool) LoggerOption`

@@ -65,10 +65,10 @@
 + `func UpdateErr(rdb *gorm.DB) (xstatus.DbStatus, error)`
 + `func DeleteErr(rdb *gorm.DB) (xstatus.DbStatus, error)`
 + `func NewPropertyValue(reverse bool, destinations ...string) *PropertyValue`
-+ `func WithSourceSeparator(separator string) OrderByOption`
-+ `func WithTargetSeparator(separator string) OrderByOption`
-+ `func WithSourceProcessor(processor func(source string) (field string, asc bool)) OrderByOption`
-+ `func WithTargetProcessor(processor func(destination string, asc bool) (target string)) OrderByOption`
++ `func WithOrderBySourceSeparator(separator string) OrderByOption`
++ `func WithOrderByTargetSeparator(separator string) OrderByOption`
++ `func WithOrderBySourceProcessor(processor func(source string) (field string, asc bool)) OrderByOption`
++ `func WithOrderByTargetProcessor(processor func(destination string, asc bool) (target string)) OrderByOption`
 + `func GenerateOrderByExpr(querySource string, dict PropertyDict, options ...OrderByOption) string`
 + `func HookDeletedAt(db *gorm.DB, defaultTimestamp string)`
 + `func WithLogInfo(log bool) LoggerOption`

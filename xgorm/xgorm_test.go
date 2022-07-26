@@ -185,7 +185,10 @@ func testHelper(t *testing.T, giveDialect, giveParam string) {
 		"username": NewPropertyValue(false, "firstname", "lastname"),
 		"age":      NewPropertyValue(true, "birthday"),
 	}
-	nilOptions := []OrderByOption{WithSourceSeparator(""), WithTargetSeparator(""), WithSourceProcessor(nil), WithTargetProcessor(nil)}
+	nilOptions := []OrderByOption{
+		WithOrderBySourceSeparator(""), WithOrderByTargetSeparator(""),
+		WithOrderBySourceProcessor(nil), WithOrderByTargetProcessor(nil),
+	}
 	for _, tc := range []struct {
 		giveSource string
 		giveDict   PropertyDict

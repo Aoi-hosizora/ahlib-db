@@ -164,25 +164,25 @@ type PropertyDict = xdbutils_orderby.PropertyDict
 // OrderByOption represents an option type for GenerateOrderByExpr's option, can be created by WithXXX functions.
 type OrderByOption = xdbutils_orderby.OrderByOption
 
-// WithSourceSeparator creates an OrderByOption to specify the source order-by expression fields separator, defaults to ",".
-func WithSourceSeparator(separator string) OrderByOption {
+// WithOrderBySourceSeparator creates an OrderByOption to specify the source order-by expression fields separator, defaults to ",".
+func WithOrderBySourceSeparator(separator string) OrderByOption {
 	return xdbutils_orderby.WithSourceSeparator(separator)
 }
 
-// WithTargetSeparator creates an OrderByOption to specify the target order-by expression fields separator, defaults to ", ".
-func WithTargetSeparator(separator string) OrderByOption {
+// WithOrderByTargetSeparator creates an OrderByOption to specify the target order-by expression fields separator, defaults to ", ".
+func WithOrderByTargetSeparator(separator string) OrderByOption {
 	return xdbutils_orderby.WithTargetSeparator(separator)
 }
 
-// WithSourceProcessor creates an OrderByOption to specify the source processor for extracting field name and ascending flag from given source,
+// WithOrderBySourceProcessor creates an OrderByOption to specify the source processor for extracting field name and ascending flag from given source,
 // defaults to use the "field asc" or "field desc" format (case-insensitive) to extract information.
-func WithSourceProcessor(processor func(source string) (field string, asc bool)) OrderByOption {
+func WithOrderBySourceProcessor(processor func(source string) (field string, asc bool)) OrderByOption {
 	return xdbutils_orderby.WithSourceProcessor(processor)
 }
 
-// WithTargetProcessor creates an OrderByOption to specify the target processor for combining field name and ascending flag to target expression,
+// WithOrderByTargetProcessor creates an OrderByOption to specify the target processor for combining field name and ascending flag to target expression,
 // defaults to generate the target with "destination ASC" or "destination DESC" format.
-func WithTargetProcessor(processor func(destination string, asc bool) (target string)) OrderByOption {
+func WithOrderByTargetProcessor(processor func(destination string, asc bool) (target string)) OrderByOption {
 	return xdbutils_orderby.WithTargetProcessor(processor)
 }
 

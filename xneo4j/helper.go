@@ -131,6 +131,83 @@ func GetDuration(data interface{}) neo4j.Duration {
 	return data.(neo4j.Duration)
 }
 
+// ====================
+// neo4j config options
+// ====================
+
+// DriverOption represents an option type for neo4j.NewDriver's option, can be created by WithXXX functions.
+type DriverOption func(*neo4j.Config)
+
+// WithEncrypted creates an DriverOption function to specify encrypted flag for neo4j.Driver, defaults to true.
+func WithEncrypted(encrypted bool) DriverOption {
+	return func(config *neo4j.Config) {
+		config.Encrypted = encrypted
+	}
+}
+
+// WithTrustStrategy creates an DriverOption function to specify trust strategy for neo4j.Driver, defaults to neo4j.TrustAny(false).
+func WithTrustStrategy(e neo4j.TrustStrategy) DriverOption {
+	return func(config *neo4j.Config) {
+		config.TrustStrategy = e
+	}
+}
+
+// WithLog creates an DriverOption function to specify log function for neo4j.Driver, defaults to neo4j.NoOpLogger.
+func WithLog(l neo4j.Logging) DriverOption {
+	return func(config *neo4j.Config) {
+		config.Log = l
+	}
+}
+
+// WithAddressResolver creates an DriverOption function to specify address resolver for neo4j.Driver, defaults to nil.
+func WithAddressResolver(resolver neo4j.ServerAddressResolver) DriverOption {
+	return func(config *neo4j.Config) {
+		config.AddressResolver = resolver
+	}
+}
+
+// WithMaxTransactionRetryTime creates an DriverOption function to specify max transaction retry time for neo4j.Driver, defaults to 30s.
+func WithMaxTransactionRetryTime(t time.Duration) DriverOption {
+	return func(config *neo4j.Config) {
+		config.MaxTransactionRetryTime = t
+	}
+}
+
+// WithMaxConnectionPoolSize creates an DriverOption function to specify max connection pool size for neo4j.Driver, defaults to 100.
+func WithMaxConnectionPoolSize(size int) DriverOption {
+	return func(config *neo4j.Config) {
+		config.MaxConnectionPoolSize = size
+	}
+}
+
+// WithMaxConnectionLifetime creates an DriverOption function to specify max connection lifetime for neo4j.Driver, defaults to 1h.
+func WithMaxConnectionLifetime(t time.Duration) DriverOption {
+	return func(config *neo4j.Config) {
+		config.MaxConnectionLifetime = t
+	}
+}
+
+// WithConnectionAcquisitionTimeout creates an DriverOption function to specify connection acquisition timeout for neo4j.Driver, defaults to 1min.
+func WithConnectionAcquisitionTimeout(t time.Duration) DriverOption {
+	return func(config *neo4j.Config) {
+		config.ConnectionAcquisitionTimeout = t
+	}
+}
+
+// WithSocketConnectTimeout creates an DriverOption function to specify socket connect timeout for neo4j.Driver, defaults to 5s.
+func WithSocketConnectTimeout(t time.Duration) DriverOption {
+	return func(config *neo4j.Config) {
+		config.SocketConnectTimeout = t
+	}
+}
+
+// WithSocketKeepalive creates an DriverOption function to specify socket keepalive flag for neo4j.Driver, defaults to true.
+func WithSocketKeepalive(keepalive bool) DriverOption {
+	return func(config *neo4j.Config) {
+		config.SocketKeepalive = keepalive
+	}
+}
+
 // ========
 // order by
 // ========
@@ -144,25 +221,25 @@ type PropertyDict = xdbutils_orderby.PropertyDict
 // OrderByOption represents an option type for GenerateOrderByExpr's option, can be created by WithXXX functions.
 type OrderByOption = xdbutils_orderby.OrderByOption
 
-// WithSourceSeparator creates an OrderByOption to specify the source order-by expression fields separator, defaults to ",".
-func WithSourceSeparator(separator string) OrderByOption {
+// WithOrderBySourceSeparator creates an OrderByOption to specify the source order-by expression fields separator, defaults to ",".
+func WithOrderBySourceSeparator(separator string) OrderByOption {
 	return xdbutils_orderby.WithSourceSeparator(separator)
 }
 
-// WithTargetSeparator creates an OrderByOption to specify the target order-by expression fields separator, defaults to ", ".
-func WithTargetSeparator(separator string) OrderByOption {
+// WithOrderByTargetSeparator creates an OrderByOption to specify the target order-by expression fields separator, defaults to ", ".
+func WithOrderByTargetSeparator(separator string) OrderByOption {
 	return xdbutils_orderby.WithTargetSeparator(separator)
 }
 
-// WithSourceProcessor creates an OrderByOption to specify the source processor for extracting field name and ascending flag from given source,
+// WithOrderBySourceProcessor creates an OrderByOption to specify the source processor for extracting field name and ascending flag from given source,
 // defaults to use the "field asc" or "field desc" format (case-insensitive) to extract information.
-func WithSourceProcessor(processor func(source string) (field string, asc bool)) OrderByOption {
+func WithOrderBySourceProcessor(processor func(source string) (field string, asc bool)) OrderByOption {
 	return xdbutils_orderby.WithSourceProcessor(processor)
 }
 
-// WithTargetProcessor creates an OrderByOption to specify the target processor for combining field name and ascending flag to target expression,
+// WithOrderByTargetProcessor creates an OrderByOption to specify the target processor for combining field name and ascending flag to target expression,
 // defaults to generate the target with "destination ASC" or "destination DESC" format.
-func WithTargetProcessor(processor func(destination string, asc bool) (target string)) OrderByOption {
+func WithOrderByTargetProcessor(processor func(destination string, asc bool) (target string)) OrderByOption {
 	return xdbutils_orderby.WithTargetProcessor(processor)
 }
 
@@ -188,81 +265,4 @@ func NewPropertyValue(reverse bool, destinations ...string) *PropertyValue {
 // 	_ = GenerateOrderByExpr(`age, username desc`, dict) // => u.birthday DESC, p.firstname DESC, p.lastname DESC
 func GenerateOrderByExpr(querySource string, dict PropertyDict, options ...OrderByOption) string {
 	return xdbutils_orderby.GenerateOrderByExpr(querySource, dict, options...)
-}
-
-// ====================
-// neo4j config options
-// ====================
-
-// DriverOption represents an option type for neo4j.NewDriver's option, can be created by WithXXX functions.
-type DriverOption func(*neo4j.Config)
-
-// WithEncrypted returns a neo4j.Config option function to specify encrypted flag for neo4j.Driver, defaults to true.
-func WithEncrypted(encrypted bool) DriverOption {
-	return func(config *neo4j.Config) {
-		config.Encrypted = encrypted
-	}
-}
-
-// WithTrustStrategy returns a neo4j.Config option function to specify trust strategy for neo4j.Driver, defaults to neo4j.TrustAny(false).
-func WithTrustStrategy(e neo4j.TrustStrategy) DriverOption {
-	return func(config *neo4j.Config) {
-		config.TrustStrategy = e
-	}
-}
-
-// WithLog returns a neo4j.Config option function to specify log function for neo4j.Driver, defaults to neo4j.NoOpLogger.
-func WithLog(l neo4j.Logging) DriverOption {
-	return func(config *neo4j.Config) {
-		config.Log = l
-	}
-}
-
-// WithAddressResolver returns a neo4j.Config option function to specify address resolver for neo4j.Driver, defaults to nil.
-func WithAddressResolver(resolver neo4j.ServerAddressResolver) DriverOption {
-	return func(config *neo4j.Config) {
-		config.AddressResolver = resolver
-	}
-}
-
-// WithMaxTransactionRetryTime returns a neo4j.Config option function to specify max transaction retry time for neo4j.Driver, defaults to 30s.
-func WithMaxTransactionRetryTime(t time.Duration) DriverOption {
-	return func(config *neo4j.Config) {
-		config.MaxTransactionRetryTime = t
-	}
-}
-
-// WithMaxConnectionPoolSize returns a neo4j.Config option function to specify max connection pool size for neo4j.Driver, defaults to 100.
-func WithMaxConnectionPoolSize(size int) DriverOption {
-	return func(config *neo4j.Config) {
-		config.MaxConnectionPoolSize = size
-	}
-}
-
-// WithMaxConnectionLifetime returns a neo4j.Config option function to specify max connection lifetime for neo4j.Driver, defaults to 1h.
-func WithMaxConnectionLifetime(t time.Duration) DriverOption {
-	return func(config *neo4j.Config) {
-		config.MaxConnectionLifetime = t
-	}
-}
-
-// WithConnectionAcquisitionTimeout returns a neo4j.Config option function to specify connection acquisition timeout for neo4j.Driver, defaults to 1min.
-func WithConnectionAcquisitionTimeout(t time.Duration) DriverOption {
-	return func(config *neo4j.Config) {
-		config.ConnectionAcquisitionTimeout = t
-	}
-}
-
-// WithSocketConnectTimeout returns a neo4j.Config option function to specify socket connect timeout for neo4j.Driver, defaults to 5s.
-func WithSocketConnectTimeout(t time.Duration) DriverOption {
-	return func(config *neo4j.Config) {
-		config.SocketConnectTimeout = t
-	}
-}
-
-// WithSocketKeepalive returns a neo4j.Config option function to specify socket keepalive flag for neo4j.Driver, defaults to true.
-func WithSocketKeepalive(keepalive bool) DriverOption {
-	return func(config *neo4j.Config) {
-		config.SocketKeepalive = keepalive
-	}
 }

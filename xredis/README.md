@@ -29,8 +29,10 @@
 ### Functions
 
 + `func ScanAll(ctx context.Context, client *redis.Client, match string, count int64) (keys []string, err error)`
++ `func ScanAllWithCallback(ctx context.Context, client *redis.Client, match string, count int64, callback func(keys []string)) error`
 + `func DelAll(ctx context.Context, client *redis.Client, pattern string) (tot int64, err error)`
 + `func DelAllByScan(ctx context.Context, client *redis.Client, pattern string, scanCount int64) (tot int64, err error)`
++ `func DelAllByScanCallback(ctx context.Context, client *redis.Client, pattern string, scanCount int64, ignoreDelError bool) (tot int64, err error)`
 + `func WithLogErr(log bool) LoggerOption`
 + `func WithLogCmd(log bool) LoggerOption`
 + `func WithSkip(skip int) LoggerOption`
