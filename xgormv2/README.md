@@ -3,6 +3,7 @@
 ## Dependencies
 
 + github.com/Aoi-hosizora/ahlib
++ github.com/Aoi-hosizora/ahlib-db/xdbutils
 + gorm.io/gorm
 + gorm.io/driver/mysql
 + gorm.io/driver/sqlite (cgo)

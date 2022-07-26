@@ -3,6 +3,7 @@
 ## Dependencies
 
 + github.com/Aoi-hosizora/ahlib
++ github.com/Aoi-hosizora/ahlib-db/xdbutils
 + github.com/jinzhu/gorm
 + github.com/go-sql-driver/mysql
 + github.com/VividCortex/mysqlerr

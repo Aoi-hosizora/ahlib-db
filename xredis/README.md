@@ -3,7 +3,7 @@
 ## Dependencies
 
 + github.com/Aoi-hosizora/ahlib
-+ github.com/go-redis/redis
++ github.com/go-redis/redis/v8
 + github.com/sirupsen/logrus
 
 ## Documents

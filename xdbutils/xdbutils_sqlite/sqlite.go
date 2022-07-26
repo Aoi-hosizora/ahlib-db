@@ -23,7 +23,7 @@ func CheckSQLiteErrorExtendedCodeByReflect(err error, code int) bool {
 
 	field := val.FieldByName("ExtendedCode")
 	if field.IsValid() && field.Kind() == reflect.Int {
-		extendedCode := field.Interface().(int)
+		extendedCode := int(field.Int())
 		return extendedCode == code
 	}
 	return false
@@ -31,10 +31,10 @@ func CheckSQLiteErrorExtendedCodeByReflect(err error, code int) bool {
 
 // The following code are almost referred from https://github.com/mattn/go-sqlite3/blob/master/error.go.
 
-// ErrNo represents sqlite3.Error's Error field, inherits errno.
+// ErrNo represents sqlite3.Error's Error field, which inherits errno.
 type ErrNo int
 
-// ErrNoExtended represents sqlite3.Error's ExtendedCode field, is extended errno.
+// ErrNoExtended represents sqlite3.Error's ExtendedCode field, which is extended errno.
 type ErrNoExtended int
 
 // Extend returns extended errno.
@@ -42,7 +42,7 @@ func (err ErrNo) Extend(by int) ErrNoExtended {
 	return ErrNoExtended(int(err) | (by << 8))
 }
 
-// result codes from http://www.sqlite.org/c3ref/c_abort.html
+// Result codes from http://www.sqlite.org/c3ref/c_abort.html.
 const (
 	ErrError      = ErrNo(1)  /* SQL error or missing database */
 	ErrInternal   = ErrNo(2)  /* Internal logic error in SQLite */
@@ -74,58 +74,58 @@ const (
 	ErrWarning    = ErrNo(28) /* Warnings from sqlite3_log() */
 )
 
-// result codes from http://www.sqlite.org/c3ref/c_abort_rollback.html
+// Result codes from http://www.sqlite.org/c3ref/c_abort_rollback.html.
 const (
-	ErrIoErrRead              = ErrNoExtended(10 | 1<<8)  // ErrIoErr.Extend(1) => ErrIoErr = ErrNo(10)
-	ErrIoErrShortRead         = ErrNoExtended(10 | 2<<8)  // ErrIoErr.Extend(2)
-	ErrIoErrWrite             = ErrNoExtended(10 | 3<<8)  // ErrIoErr.Extend(3)
-	ErrIoErrFsync             = ErrNoExtended(10 | 4<<8)  // ErrIoErr.Extend(4)
-	ErrIoErrDirFsync          = ErrNoExtended(10 | 5<<8)  // ErrIoErr.Extend(5)
-	ErrIoErrTruncate          = ErrNoExtended(10 | 6<<8)  // ErrIoErr.Extend(6)
-	ErrIoErrFstat             = ErrNoExtended(10 | 7<<8)  // ErrIoErr.Extend(7)
-	ErrIoErrUnlock            = ErrNoExtended(10 | 8<<8)  // ErrIoErr.Extend(8)
-	ErrIoErrRDlock            = ErrNoExtended(10 | 9<<8)  // ErrIoErr.Extend(9)
-	ErrIoErrDelete            = ErrNoExtended(10 | 10<<8) // ErrIoErr.Extend(10)
-	ErrIoErrBlocked           = ErrNoExtended(10 | 11<<8) // ErrIoErr.Extend(11)
-	ErrIoErrNoMem             = ErrNoExtended(10 | 12<<8) // ErrIoErr.Extend(12)
-	ErrIoErrAccess            = ErrNoExtended(10 | 13<<8) // ErrIoErr.Extend(13)
-	ErrIoErrCheckReservedLock = ErrNoExtended(10 | 14<<8) // ErrIoErr.Extend(14)
-	ErrIoErrLock              = ErrNoExtended(10 | 15<<8) // ErrIoErr.Extend(15)
-	ErrIoErrClose             = ErrNoExtended(10 | 16<<8) // ErrIoErr.Extend(16)
-	ErrIoErrDirClose          = ErrNoExtended(10 | 17<<8) // ErrIoErr.Extend(17)
-	ErrIoErrSHMOpen           = ErrNoExtended(10 | 18<<8) // ErrIoErr.Extend(18)
-	ErrIoErrSHMSize           = ErrNoExtended(10 | 19<<8) // ErrIoErr.Extend(19)
-	ErrIoErrSHMLock           = ErrNoExtended(10 | 20<<8) // ErrIoErr.Extend(20)
-	ErrIoErrSHMMap            = ErrNoExtended(10 | 21<<8) // ErrIoErr.Extend(21)
-	ErrIoErrSeek              = ErrNoExtended(10 | 22<<8) // ErrIoErr.Extend(22)
-	ErrIoErrDeleteNoent       = ErrNoExtended(10 | 23<<8) // ErrIoErr.Extend(23)
-	ErrIoErrMMap              = ErrNoExtended(10 | 24<<8) // ErrIoErr.Extend(24)
-	ErrIoErrGetTempPath       = ErrNoExtended(10 | 25<<8) // ErrIoErr.Extend(25)
-	ErrIoErrConvPath          = ErrNoExtended(10 | 26<<8) // ErrIoErr.Extend(26)
-	ErrLockedSharedCache      = ErrNoExtended(6 | 1<<8)   // ErrLocked.Extend(1) => ErrLocked = ErrNo(6)
-	ErrBusyRecovery           = ErrNoExtended(5 | 1<<8)   // ErrBusy.Extend(1) => ErrBusy = ErrNo(5)
-	ErrBusySnapshot           = ErrNoExtended(5 | 2<<8)   // ErrBusy.Extend(2)
-	ErrCantOpenNoTempDir      = ErrNoExtended(14 | 1<<8)  // ErrCantOpen.Extend(1) => ErrCantOpen = ErrNo(14)
-	ErrCantOpenIsDir          = ErrNoExtended(14 | 2<<8)  // ErrCantOpen.Extend(2)
-	ErrCantOpenFullPath       = ErrNoExtended(14 | 3<<8)  // ErrCantOpen.Extend(3)
-	ErrCantOpenConvPath       = ErrNoExtended(14 | 4<<8)  // ErrCantOpen.Extend(4)
-	ErrCorruptVTab            = ErrNoExtended(11 | 1<<8)  // ErrCorrupt.Extend(1) => ErrCorrupt = ErrNo(11)
-	ErrReadonlyRecovery       = ErrNoExtended(8 | 1<<8)   // ErrReadonly.Extend(1) => ErrReadonly = ErrNo(8)
-	ErrReadonlyCantLock       = ErrNoExtended(8 | 2<<8)   // ErrReadonly.Extend(2)
-	ErrReadonlyRollback       = ErrNoExtended(8 | 3<<8)   // ErrReadonly.Extend(3)
-	ErrReadonlyDbMoved        = ErrNoExtended(8 | 4<<8)   // ErrReadonly.Extend(4)
-	ErrAbortRollback          = ErrNoExtended(4 | 2<<8)   // ErrAbort.Extend(2) => ErrAbort = ErrNo(4)
-	ErrConstraintCheck        = ErrNoExtended(19 | 1<<8)  // ErrConstraint.Extend(1) => ErrConstraint = ErrNo(19)
-	ErrConstraintCommitHook   = ErrNoExtended(19 | 2<<8)  // ErrConstraint.Extend(2)
-	ErrConstraintForeignKey   = ErrNoExtended(19 | 3<<8)  // ErrConstraint.Extend(3)
-	ErrConstraintFunction     = ErrNoExtended(19 | 4<<8)  // ErrConstraint.Extend(4)
-	ErrConstraintNotNull      = ErrNoExtended(19 | 5<<8)  // ErrConstraint.Extend(5)
-	ErrConstraintPrimaryKey   = ErrNoExtended(19 | 6<<8)  // ErrConstraint.Extend(6)
-	ErrConstraintTrigger      = ErrNoExtended(19 | 7<<8)  // ErrConstraint.Extend(7)
-	ErrConstraintUnique       = ErrNoExtended(19 | 8<<8)  // ErrConstraint.Extend(8)
-	ErrConstraintVTab         = ErrNoExtended(19 | 9<<8)  // ErrConstraint.Extend(9)
-	ErrConstraintRowID        = ErrNoExtended(19 | 10<<8) // ErrConstraint.Extend(10)
-	ErrNoticeRecoverWAL       = ErrNoExtended(27 | 1<<8)  // ErrNotice.Extend(1) => ErrNotice = ErrNo(27)
-	ErrNoticeRecoverRollback  = ErrNoExtended(27 | 2<<8)  // ErrNotice.Extend(2)
-	ErrWarningAutoIndex       = ErrNoExtended(28 | 1<<8)  // ErrWarning.Extend(1) => ErrWarning = ErrNo(28)
+	ErrIoErrRead              = ErrNoExtended(ErrIoErr | 1<<8)       // ErrIoErr.Extend(1) => ErrIoErr = ErrNo(10)
+	ErrIoErrShortRead         = ErrNoExtended(ErrIoErr | 2<<8)       // ErrIoErr.Extend(2)
+	ErrIoErrWrite             = ErrNoExtended(ErrIoErr | 3<<8)       // ErrIoErr.Extend(3)
+	ErrIoErrFsync             = ErrNoExtended(ErrIoErr | 4<<8)       // ErrIoErr.Extend(4)
+	ErrIoErrDirFsync          = ErrNoExtended(ErrIoErr | 5<<8)       // ErrIoErr.Extend(5)
+	ErrIoErrTruncate          = ErrNoExtended(ErrIoErr | 6<<8)       // ErrIoErr.Extend(6)
+	ErrIoErrFstat             = ErrNoExtended(ErrIoErr | 7<<8)       // ErrIoErr.Extend(7)
+	ErrIoErrUnlock            = ErrNoExtended(ErrIoErr | 8<<8)       // ErrIoErr.Extend(8)
+	ErrIoErrRDlock            = ErrNoExtended(ErrIoErr | 9<<8)       // ErrIoErr.Extend(9)
+	ErrIoErrDelete            = ErrNoExtended(ErrIoErr | 10<<8)      // ErrIoErr.Extend(10)
+	ErrIoErrBlocked           = ErrNoExtended(ErrIoErr | 11<<8)      // ErrIoErr.Extend(11)
+	ErrIoErrNoMem             = ErrNoExtended(ErrIoErr | 12<<8)      // ErrIoErr.Extend(12)
+	ErrIoErrAccess            = ErrNoExtended(ErrIoErr | 13<<8)      // ErrIoErr.Extend(13)
+	ErrIoErrCheckReservedLock = ErrNoExtended(ErrIoErr | 14<<8)      // ErrIoErr.Extend(14)
+	ErrIoErrLock              = ErrNoExtended(ErrIoErr | 15<<8)      // ErrIoErr.Extend(15)
+	ErrIoErrClose             = ErrNoExtended(ErrIoErr | 16<<8)      // ErrIoErr.Extend(16)
+	ErrIoErrDirClose          = ErrNoExtended(ErrIoErr | 17<<8)      // ErrIoErr.Extend(17)
+	ErrIoErrSHMOpen           = ErrNoExtended(ErrIoErr | 18<<8)      // ErrIoErr.Extend(18)
+	ErrIoErrSHMSize           = ErrNoExtended(ErrIoErr | 19<<8)      // ErrIoErr.Extend(19)
+	ErrIoErrSHMLock           = ErrNoExtended(ErrIoErr | 20<<8)      // ErrIoErr.Extend(20)
+	ErrIoErrSHMMap            = ErrNoExtended(ErrIoErr | 21<<8)      // ErrIoErr.Extend(21)
+	ErrIoErrSeek              = ErrNoExtended(ErrIoErr | 22<<8)      // ErrIoErr.Extend(22)
+	ErrIoErrDeleteNoent       = ErrNoExtended(ErrIoErr | 23<<8)      // ErrIoErr.Extend(23)
+	ErrIoErrMMap              = ErrNoExtended(ErrIoErr | 24<<8)      // ErrIoErr.Extend(24)
+	ErrIoErrGetTempPath       = ErrNoExtended(ErrIoErr | 25<<8)      // ErrIoErr.Extend(25)
+	ErrIoErrConvPath          = ErrNoExtended(ErrIoErr | 26<<8)      // ErrIoErr.Extend(26)
+	ErrLockedSharedCache      = ErrNoExtended(ErrLocked | 1<<8)      // ErrLocked.Extend(1) => ErrLocked = ErrNo(6)
+	ErrBusyRecovery           = ErrNoExtended(ErrBusy | 1<<8)        // ErrBusy.Extend(1) => ErrBusy = ErrNo(5)
+	ErrBusySnapshot           = ErrNoExtended(ErrBusy | 2<<8)        // ErrBusy.Extend(2)
+	ErrCantOpenNoTempDir      = ErrNoExtended(ErrCantOpen | 1<<8)    // ErrCantOpen.Extend(1) => ErrCantOpen = ErrNo(14)
+	ErrCantOpenIsDir          = ErrNoExtended(ErrCantOpen | 2<<8)    // ErrCantOpen.Extend(2)
+	ErrCantOpenFullPath       = ErrNoExtended(ErrCantOpen | 3<<8)    // ErrCantOpen.Extend(3)
+	ErrCantOpenConvPath       = ErrNoExtended(ErrCantOpen | 4<<8)    // ErrCantOpen.Extend(4)
+	ErrCorruptVTab            = ErrNoExtended(ErrCorrupt | 1<<8)     // ErrCorrupt.Extend(1) => ErrCorrupt = ErrNo(11)
+	ErrReadonlyRecovery       = ErrNoExtended(ErrReadonly | 1<<8)    // ErrReadonly.Extend(1) => ErrReadonly = ErrNo(8)
+	ErrReadonlyCantLock       = ErrNoExtended(ErrReadonly | 2<<8)    // ErrReadonly.Extend(2)
+	ErrReadonlyRollback       = ErrNoExtended(ErrReadonly | 3<<8)    // ErrReadonly.Extend(3)
+	ErrReadonlyDbMoved        = ErrNoExtended(ErrReadonly | 4<<8)    // ErrReadonly.Extend(4)
+	ErrAbortRollback          = ErrNoExtended(ErrAbort | 2<<8)       // ErrAbort.Extend(2) => ErrAbort = ErrNo(4)
+	ErrConstraintCheck        = ErrNoExtended(ErrConstraint | 1<<8)  // ErrConstraint.Extend(1) => ErrConstraint = ErrNo(19)
+	ErrConstraintCommitHook   = ErrNoExtended(ErrConstraint | 2<<8)  // ErrConstraint.Extend(2)
+	ErrConstraintForeignKey   = ErrNoExtended(ErrConstraint | 3<<8)  // ErrConstraint.Extend(3)
+	ErrConstraintFunction     = ErrNoExtended(ErrConstraint | 4<<8)  // ErrConstraint.Extend(4)
+	ErrConstraintNotNull      = ErrNoExtended(ErrConstraint | 5<<8)  // ErrConstraint.Extend(5)
+	ErrConstraintPrimaryKey   = ErrNoExtended(ErrConstraint | 6<<8)  // ErrConstraint.Extend(6)
+	ErrConstraintTrigger      = ErrNoExtended(ErrConstraint | 7<<8)  // ErrConstraint.Extend(7)
+	ErrConstraintUnique       = ErrNoExtended(ErrConstraint | 8<<8)  // ErrConstraint.Extend(8)
+	ErrConstraintVTab         = ErrNoExtended(ErrConstraint | 9<<8)  // ErrConstraint.Extend(9)
+	ErrConstraintRowID        = ErrNoExtended(ErrConstraint | 10<<8) // ErrConstraint.Extend(10)
+	ErrNoticeRecoverWAL       = ErrNoExtended(ErrNotice | 1<<8)      // ErrNotice.Extend(1) => ErrNotice = ErrNo(27)
+	ErrNoticeRecoverRollback  = ErrNoExtended(ErrNotice | 2<<8)      // ErrNotice.Extend(2)
+	ErrWarningAutoIndex       = ErrNoExtended(ErrWarning | 1<<8)     // ErrWarning.Extend(1) => ErrWarning = ErrNo(28)
 )

@@ -3,6 +3,7 @@
 ## Dependencies
 
 + github.com/Aoi-hosizora/ahlib
++ github.com/Aoi-hosizora/ahlib-db/xdbutils
 + github.com/neo4j/neo4j-go-driver
 + github.com/sirupsen/logrus
 
