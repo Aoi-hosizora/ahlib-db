@@ -14,9 +14,9 @@ type SQLiteConfig struct {
 	VFS       string // The name of a VFS object
 	Mode      string // Access Mode (ro, rw, rwc, memory)
 	Cache     string // Shared-Cache Mode (shared, private)
-	Psow      *bool  //
-	NoLock    *bool  //
-	Immutable *bool  //
+	Psow      *bool  // ...
+	NoLock    *bool  // ...
+	Immutable *bool  // ...
 
 	// go-sqlite3 package parameters
 	Auth                   bool   // UA - Create, defaults to false
@@ -40,7 +40,7 @@ type SQLiteConfig struct {
 	Loc                    string // Time Zone Location (auto, ...), defaults to ignore this option
 	TransactionLock        string // Transaction Lock (immediate, deferred, exclusive), defaults to deferred
 	WritableSchema         *bool  // Writable Schema, defaults to ignore this option
-	CacheSize              *int64 // Cache Size, defaults to ignore this option
+	CacheSize              *int   // Cache Size, defaults to ignore this option
 }
 
 // FormatDSN generates formatted DSN string from SQLiteConfig.
@@ -111,7 +111,7 @@ func (s *SQLiteConfig) FormatDSN() string {
 		values.Set("_writable_schema", boolString(*s.WritableSchema))
 	}
 	if s.CacheSize != nil {
-		values.Set("_busy_timeout", strconv.FormatInt(*s.CacheSize, 10))
+		values.Set("_busy_timeout", strconv.Itoa(*s.CacheSize))
 	}
 
 	if s.VFS != "" {

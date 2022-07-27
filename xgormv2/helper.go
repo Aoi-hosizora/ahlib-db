@@ -3,7 +3,9 @@ package xgormv2
 import (
 	"errors"
 	"fmt"
+	"github.com/Aoi-hosizora/ahlib-db/xdbutils/xdbutils_mysql"
 	"github.com/Aoi-hosizora/ahlib-db/xdbutils/xdbutils_orderby"
+	"github.com/Aoi-hosizora/ahlib-db/xdbutils/xdbutils_postgres"
 	"github.com/Aoi-hosizora/ahlib-db/xdbutils/xdbutils_sqlite"
 	"github.com/Aoi-hosizora/ahlib/xstatus"
 	"github.com/VividCortex/mysqlerr"
@@ -44,29 +46,30 @@ func IsPostgreSQL(db *gorm.DB) bool {
 // MySQLConfig is a configuration for MySQL, can be used to generate DSN by FormatDSN method.
 type MySQLConfig = mysql.Config
 
+// MySQLExtraConfig is an extra configuration for MySQL, can be used to extend Param by ExtendParam method.
+type MySQLExtraConfig = xdbutils_mysql.MySQLExtraConfig
+
 // SQLiteConfig is a configuration for SQLite, can be used to generate DSN by FormatDSN method.
 type SQLiteConfig = xdbutils_sqlite.SQLiteConfig
 
-// MySQLDefaultCharsetTimeLocParam returns a map as mysql.Config's Param value, it contains the default "utf8mb4" charset, "True" parseTime, and
-// "Local" loc.
-func MySQLDefaultCharsetTimeLocParam() map[string]string {
-	return map[string]string{"charset": "utf8mb4", "parseTime": "True", "loc": "Local"}
-}
+// PostgreSQLConfig is a configuration for PostgreSQL, can be used to generate DSN by FormatDSN method.
+type PostgreSQLConfig = xdbutils_postgres.PostgreSQLConfig
 
-// MySQLDefaultDsn returns the MySQL dsn from given parameters with "utf8mb4" charset and "local" location. If you want to set more options in dsn,
-// please use mysql.Config or xgormv2.MySQLConfig. For more information, please visit https://github.com/go-sql-driver/mysql#dsn-data-source-name.
+// MySQLDefaultDsn returns the MySQL dsn from given parameters with "utf8mb4" charset and "local" location. For more information, please visit
+// https://github.com/go-sql-driver/mysql#dsn-data-source-name and https://dev.mysql.com/doc/refman/8.0/en/connecting-using-uri-or-key-value-pairs.html.
 func MySQLDefaultDsn(username, password, address, database string) string {
 	return fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8mb4&parseTime=True&loc=Local", username, password, address, database)
 }
 
 // SQLiteDefaultDsn returns the SQLite dsn from given parameter (database filename or ":memory:" or empty string). For more information, please visit
 // https://github.com/mattn/go-sqlite3#connection-string and https://www.sqlite.org/c3ref/open.html.
-func SQLiteDefaultDsn(filename string) string {
-	return filename
+func SQLiteDefaultDsn(file string) string {
+	return file
 }
 
 // PostgreSQLDefaultDsn returns the PostgreSQL dsn from given parameters. For more information, please visit
-// https://www.postgresql.org/docs/current/libpq-connect.html#id-1.7.3.8.3.3.
+// https://pkg.go.dev/github.com/lib/pq#hdr-Connection_String_Parameters, https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING
+// and https://www.postgresql.org/docs/current/runtime-config-client.html.
 func PostgreSQLDefaultDsn(username, password, host string, port int, database string) string {
 	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s", host, port, username, password, database)
 }

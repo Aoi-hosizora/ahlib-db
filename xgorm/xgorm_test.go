@@ -15,11 +15,6 @@ import (
 )
 
 func TestMass1(t *testing.T) {
-	param := MySQLDefaultCharsetTimeLocParam()
-	xtesting.Equal(t, param["charset"], "utf8mb4")
-	xtesting.Equal(t, param["parseTime"], "True")
-	xtesting.Equal(t, param["loc"], "Local")
-
 	xtesting.Equal(t, MySQLDefaultDsn("root", "123", "localhost:3306", "db_test"),
 		"root:123@tcp(localhost:3306)/db_test?charset=utf8mb4&parseTime=True&loc=Local")
 	xtesting.Equal(t, SQLiteDefaultDsn("test.sql"), "test.sql")

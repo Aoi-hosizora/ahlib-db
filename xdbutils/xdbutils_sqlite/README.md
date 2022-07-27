@@ -10,6 +10,7 @@
 
 + `type ErrNo int`
 + `type ErrNoExtended int`
++ `type SQLiteConfig struct`
 
 ### Variables
 
@@ -26,3 +27,4 @@
 ### Methods
 
 + `func (err ErrNo) Extend(by int) ErrNoExtended`
++ `func (s *SQLiteConfig) FormatDSN() string`

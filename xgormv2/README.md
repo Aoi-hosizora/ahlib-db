@@ -17,6 +17,9 @@
 ### Types
 
 + `type MySQLConfig struct`
++ `type MySQLExtraConfig struct`
++ `type SQLiteConfig struct`
++ `type PostgreSQLConfig struct`
 + `type PropertyValue struct`
 + `type PropertyDict map`
 + `type OrderByOption func`
@@ -55,9 +58,8 @@
 + `func IsMySQL(db *gorm.DB) bool`
 + `func IsSQLite(db *gorm.DB) bool`
 + `func IsPostgreSQL(db *gorm.DB) bool`
-+ `func MySQLDefaultCharsetTimeLocParam() map[string]string`
 + `func MySQLDefaultDsn(username, password, address, database string) string`
-+ `func SQLiteDefaultDsn(filename string) string`
++ `func SQLiteDefaultDsn(file string) string`
 + `func PostgreSQLDefaultDsn(username, password, host string, port int, database string) string`
 + `func IsMySQLDuplicateEntryError(err error) bool`
 + `func IsSQLiteUniqueConstraintError(err error) bool`
