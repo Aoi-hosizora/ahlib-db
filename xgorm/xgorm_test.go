@@ -23,7 +23,7 @@ func TestMass1(t *testing.T) {
 	xtesting.Equal(t, MySQLDefaultDsn("root", "123", "localhost:3306", "db_test"),
 		"root:123@tcp(localhost:3306)/db_test?charset=utf8mb4&parseTime=True&loc=Local")
 	xtesting.Equal(t, SQLiteDefaultDsn("test.sql"), "test.sql")
-	xtesting.Equal(t, PostgresDefaultDsn("postgres", "123", "localhost", 5432, "db_test"),
+	xtesting.Equal(t, PostgreSQLDefaultDsn("postgres", "123", "localhost", 5432, "db_test"),
 		"host=localhost port=5432 user=postgres password=123 dbname=db_test")
 
 	xtesting.True(t, IsMySQLDuplicateEntryError(&mysql.MySQLError{Number: MySQLDuplicateEntryErrno}))

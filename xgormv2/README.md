@@ -58,7 +58,7 @@
 + `func MySQLDefaultCharsetTimeLocParam() map[string]string`
 + `func MySQLDefaultDsn(username, password, address, database string) string`
 + `func SQLiteDefaultDsn(filename string) string`
-+ `func PostgresDefaultDsn(username, password, host string, port int, database string) string`
++ `func PostgreSQLDefaultDsn(username, password, host string, port int, database string) string`
 + `func IsMySQLDuplicateEntryError(err error) bool`
 + `func IsSQLiteUniqueConstraintError(err error) bool`
 + `func IsRecordNotFound(err error) bool`

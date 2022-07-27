@@ -16,13 +16,13 @@ import (
 // ========
 
 const (
-	// MySQL is "mysql" dialect for gorm. Remember to import github.com/jinzhu/gorm/dialects/mysql or github.com/go-sql-driver/mysql to load some configs.
+	// MySQL represents the "mysql" dialect for gorm. Remember to import github.com/jinzhu/gorm/dialects/mysql or github.com/go-sql-driver/mysql to initial package.
 	MySQL = "mysql"
 
-	// SQLite is "sqlite3" dialect for gorm. Remember to import github.com/jinzhu/gorm/dialects/sqlite or github.com/mattn/go-sqlite3 to load some configs.
+	// SQLite represents the "sqlite3" dialect for gorm. Remember to import github.com/jinzhu/gorm/dialects/sqlite or github.com/mattn/go-sqlite3 to initial package.
 	SQLite = "sqlite3"
 
-	// Postgres is "postgres" dialect for gorm. Remember to import github.com/jinzhu/gorm/dialects/postgres or github.com/lib/pq to load some configs.
+	// Postgres represents the "postgres" dialect for gorm. Remember to import github.com/jinzhu/gorm/dialects/postgres or github.com/lib/pq to initial package.
 	Postgres = "postgres"
 )
 
@@ -41,28 +41,33 @@ func IsPostgreSQL(db *gorm.DB) bool {
 	return db.Dialect().GetName() == Postgres
 }
 
-// MySQLConfig is an alias type of mysql.Config, can be used to generate dsl by its FormatDSN method.
+// MySQLConfig is a configuration for MySQL, can be used to generate DSN by FormatDSN method.
 type MySQLConfig = mysql.Config
 
-// MySQLDefaultCharsetTimeLocParam returns a map as mysql.Config's Param value, it contains the default "utf8mb4" charset, "True" parseTime, and "Local" loc.
+// SQLiteConfig is a configuration for SQLite, can be used to generate DSN by FormatDSN method.
+type SQLiteConfig = xdbutils_sqlite.SQLiteConfig
+
+// MySQLDefaultCharsetTimeLocParam returns a map as mysql.Config's Param value, it contains the default "utf8mb4" charset, "True" parseTime, and
+// "Local" loc.
 func MySQLDefaultCharsetTimeLocParam() map[string]string {
 	return map[string]string{"charset": "utf8mb4", "parseTime": "True", "loc": "Local"}
 }
 
 // MySQLDefaultDsn returns the MySQL dsn from given parameters with "utf8mb4" charset and "local" location. If you want to set more options in dsn,
-// please use mysql.Config or xgorm.MySQLConfig. For more information, please visit https://github.com/go-sql-driver/mysql#dsn-data-source-name.
+// please use mysql.Config or xgormv2.MySQLConfig. For more information, please visit https://github.com/go-sql-driver/mysql#dsn-data-source-name.
 func MySQLDefaultDsn(username, password, address, database string) string {
 	return fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8mb4&parseTime=True&loc=Local", username, password, address, database)
 }
 
-// SQLiteDefaultDsn returns the SQLite dsn from given username. For more information, please visit https://github.com/mattn/go-sqlite3#connection-string.
+// SQLiteDefaultDsn returns the SQLite dsn from given parameter (database filename or ":memory:" or empty string). For more information, please visit
+// https://github.com/mattn/go-sqlite3#connection-string and https://www.sqlite.org/c3ref/open.html.
 func SQLiteDefaultDsn(filename string) string {
-	return filename // fmt.Sprintf("file:%s", filename)
+	return filename
 }
 
-// PostgresDefaultDsn returns the Postgres dsn from given parameters. For more information, please visit
+// PostgreSQLDefaultDsn returns the PostgreSQL dsn from given parameters. For more information, please visit
 // https://www.postgresql.org/docs/current/libpq-connect.html#id-1.7.3.8.3.3.
-func PostgresDefaultDsn(username, password, host string, port int, database string) string {
+func PostgreSQLDefaultDsn(username, password, host string, port int, database string) string {
 	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s", host, port, username, password, database)
 }
 
