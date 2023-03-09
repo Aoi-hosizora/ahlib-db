@@ -6,6 +6,7 @@
 [![License](http://img.shields.io/badge/license-mit-blue.svg)](./LICENSE)
 [![Release](https://img.shields.io/github/v/release/Aoi-hosizora/ahlib-db)](https://github.com/Aoi-hosizora/ahlib-db/releases)
 
++ ATTENTION: This package is **ARCHIVED**, please refer to https://github.com/Aoi-hosizora/ahlib-mx and use `ahlib-mx` (origin: `ahlib-web`) instead.
 + A personal golang library for db development, including gorm (mysql, sqlite, postgresql), redis (go-redis), neo4j (neo4j-go-driver).
 
 ### Related libraries
